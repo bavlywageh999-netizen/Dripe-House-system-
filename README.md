@@ -15,3 +15,8 @@ Optional settings: MIN_AGE=18  PORT=9000  ADMIN_PASSWORD=yourpass. Data lives in
 - **Forgot password?** Enter the recovery key and a new password. This signs everyone out and gives you a new recovery key.
 - **Lost the recovery key too?** On the shop computer run: `python app.py reset-password`
 - After 8 wrong attempts the sign-in is locked for 10 minutes.
+
+## Shop page and photos
+- **Shop** (second tab) shows every product as a card with its photo, price, a "New" badge and stock warnings. Filter with the category buttons or the search box. **Add to sale** fills the cart; **Go to checkout** opens the Sales tab.
+- **Edit** on a card changes the name, price, cost, photo and "New" badge. Photos are resized in the browser and stored in the database (nothing extra to install). You can also paste an https photo link when creating a product.
+- The Inventory tab no longer shows cost or price. It is for checking and adding stock. Prices are edited from the Shop page.

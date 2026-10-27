@@ -1,5 +1,5 @@
 """Vape shop + repair workshop system. Python 3 stdlib only: python app.py -> http://localhost:8000"""
-import hashlib, json, os, re, secrets, sqlite3, sys, threading, time, traceback, webbrowser, datetime as dt
+import base64, hashlib, json, os, re, secrets, sqlite3, sys, threading, time, traceback, webbrowser, datetime as dt
 from urllib.parse import urlsplit, parse_qs
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -131,11 +131,27 @@ def summary(c, b=None):
         "ready_repairs": c.execute("SELECT COUNT(*) FROM repairs WHERE status='ready'").fetchone()[0],
         "low_stock": rows(c, "SELECT id,name,stock,low_stock FROM products WHERE stock<=low_stock ORDER BY stock")}
 
+def clean_image(v):
+    """Photos are either an uploaded picture (data URL, resized by the browser) or an https link."""
+    v = str(v or "").strip()
+    if not v: return ""
+    if len(v) > 600_000: raise Err("That photo is too large. Choose a smaller one.", 413)
+    if not re.fullmatch(r"data:image/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+|https?://\S+", v):
+        raise Err("The photo must be an uploaded picture or a link starting with https://")
+    return v
+
+def list_products(c, b):
+    out = rows(c, "SELECT * FROM products ORDER BY category,name")
+    for p in out:  # keep the list small: uploaded photos are served separately from /img/<id>
+        im = p["image"] or ""
+        if im.startswith("data:"): p["image"] = f"/img/{p['id']}?v={hashlib.md5(im.encode()).hexdigest()[:8]}"
+    return out
+
 def add_product(c, b):
     need(b, "sku", "name", "category", "price")
     try: cur = c.execute("INSERT INTO products(sku,name,category,price,cost,stock,low_stock,image,is_new) VALUES(?,?,?,?,?,?,?,?,?)",
         (b["sku"], b["name"], b["category"], float(b["price"]), float(b.get("cost") or 0), int(b.get("stock") or 0),
-         int(b.get("low_stock") or 5), b.get("image") or "", 1 if b.get("is_new") else 0))
+         int(b.get("low_stock") or 5), clean_image(b.get("image")), 1 if b.get("is_new") else 0))
     except sqlite3.IntegrityError as e: raise Err(f"Could not save product: {e}")
     return {"id": cur.lastrowid}
 
@@ -143,8 +159,9 @@ def update_product(c, b, pid):
     """Change cost/price/name/image/new-flag and receive stock (add can be negative for corrections)."""
     n = int(b.get("add") or 0)
     sets, vals = ["stock=stock+?"], [n]
-    for k, cast in (("name", str), ("price", float), ("cost", float), ("image", str), ("is_new", int)):
+    for k, cast in (("name", str), ("price", float), ("cost", float), ("is_new", int)):
         if b.get(k) not in (None, ""): sets.append(f"{k}=?"); vals.append(cast(b[k]))
+    if "image" in b: sets.append("image=?"); vals.append(clean_image(b["image"]))  # "" removes the photo
     try: ok = c.execute(f"UPDATE products SET {','.join(sets)} WHERE id=?", vals + [pid]).rowcount
     except sqlite3.IntegrityError: raise Err("Stock would go below zero")
     if not ok: raise Err("Product not found", 404)
@@ -246,7 +263,7 @@ def update_repair(c, b, rid):
 # (method, path regex) -> handler
 ROUTES = [
  ("GET", r"/api/summary", summary),
- ("GET", r"/api/products", lambda c, b: rows(c, "SELECT * FROM products ORDER BY category,name")),
+ ("GET", r"/api/products", list_products),
  ("POST", r"/api/products", add_product),
  ("PUT", r"/api/products/(\d+)", lambda c, b, i: update_product(c, b, int(i))),
  ("GET", r"/api/report", report),
@@ -267,9 +284,10 @@ ROUTES = [
 ]
 
 class H(BaseHTTPRequestHandler):
-    def send(self, code, body, ctype="application/json"):
+    def send(self, code, body, ctype="application/json", cache=None):
         data = body if isinstance(body, bytes) else json.dumps(body).encode()
         self.send_response(code); self.send_header("Content-Type", ctype)
+        if cache: self.send_header("Cache-Control", cache)
         o = self.headers.get("Origin") or ""
         if re.fullmatch(r"null|https?://(localhost|127\.0\.0\.1)(:\d+)?", o):  # only pages on this computer
             self.send_header("Access-Control-Allow-Origin", o); self.send_header("Vary", "Origin")
@@ -298,6 +316,12 @@ class H(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path.startswith("/api/"): return self.handle_api("GET")
+        im = re.fullmatch(r"/img/(\d+)", self.path.split("?")[0])
+        if im:
+            with db() as c: r = c.execute("SELECT image FROM products WHERE id=?", (int(im.group(1)),)).fetchone()
+            m = re.fullmatch(r"data:(image/[a-z+]+);base64,(.+)", (r[0] if r else "") or "", re.S)
+            if not m: return self.send(404, b"", "text/plain")
+            return self.send(200, base64.b64decode(m.group(2)), m.group(1), "public, max-age=31536000, immutable")
         here = os.path.dirname(os.path.abspath(__file__))
         for p in (os.path.join(here, "static", "index.html"), os.path.join(here, "index.html")):
             if os.path.isfile(p):

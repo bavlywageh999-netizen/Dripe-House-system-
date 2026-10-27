@@ -40,29 +40,45 @@ form{display:grid;gap:8px}label{font-size:12px;color:var(--mute);display:grid;ga
 .tk small{color:var(--mute);display:block}.tk select{width:100%;margin-top:6px}
 #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;display:none}#toast.err{background:var(--c2);color:#fff}
 body.login aside,body.login header{display:none}body.login .app{grid-template-columns:1fr}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.chip{background:var(--pan);border:1px solid var(--line);color:var(--ink);border-radius:20px;padding:6px 14px;font:500 13px Inter,sans-serif;cursor:pointer}.chip small{color:var(--mute);margin-left:4px}
+.chip[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:#fff}.chip[aria-pressed=true] small{color:#fff;opacity:.8}
+.shop{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px}
+.pc{background:var(--pan);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column}
+.pi{aspect-ratio:1/1;background:var(--pan2);display:grid;place-items:center;position:relative;overflow:hidden}
+.pi img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.so .pi img{filter:grayscale(1);opacity:.55}
+.bd{position:absolute;top:10px;font-size:12px;font-weight:600;padding:2px 9px;border-radius:12px;color:#fff}.bd.new{left:10px;background:var(--acc)}.bd.out,.bd.low{right:10px}.bd.out{background:var(--c2)}.bd.low{background:var(--c3);color:#111}
+.pb{padding:12px;display:flex;flex-direction:column;gap:4px;flex:1}.pb small{color:var(--mute)}
+.pn{font-weight:600;line-height:1.3;min-height:2.6em;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pp{font-size:17px;font-weight:700;margin:2px 0 8px}.pb .row{margin-top:auto}
+.cartbar{position:fixed;right:22px;bottom:16px;display:flex;gap:14px;align-items:center;background:var(--pan);border:1px solid var(--acc);border-radius:12px;padding:10px 12px 10px 16px;box-shadow:0 8px 28px rgba(0,0,0,.35);z-index:20}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:16px;z-index:50}.md{width:min(420px,100%);max-height:92vh;overflow:auto}
+.pv{width:96px;height:96px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:var(--pan2)}.pv[hidden]{display:none}
 .lg-card{max-width:340px;margin:12vh auto 0}.lg-card input{font-size:16px}.lg-card h2{font-size:16px;margin:0 0 4px}.lg-card p{margin:0 0 10px;color:var(--mute);font-size:13px}
 .pw{position:relative;display:grid}.pw input{padding-right:64px}.pw button{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--mute);font:500 12px Inter,sans-serif;padding:6px 8px;cursor:pointer;border-radius:6px}.pw button:hover{color:var(--ink)}
 .opts{display:flex;justify-content:space-between;align-items:center;gap:8px}.opts label{display:flex;flex-direction:row;align-items:center;gap:7px;color:var(--ink);font-size:13px}
 .link{background:none;border:0;padding:4px 0;color:var(--acc);font:500 13px Inter,sans-serif;cursor:pointer}.link:hover{text-decoration:underline}
 .sr{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
 .key{font:600 18px ui-monospace,Menlo,Consolas,monospace;letter-spacing:.08em;background:var(--pan2);border:1px dashed var(--line);border-radius:8px;padding:12px;text-align:center;user-select:all}
+@media(max-width:600px){.shop{grid-template-columns:repeat(2,1fr);gap:10px}.pb{padding:10px}.pb .row{flex-wrap:wrap}.pb .row .b{flex:1 1 100%}.pp{font-size:15px}.cartbar{left:12px;right:12px;justify-content:space-between}}
 @media(max-width:900px){.app{grid-template-columns:1fr}aside{flex-direction:row;align-items:center;overflow-x:auto;padding:8px}nav{flex-direction:row}.kpis{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}
 </style></head><body>
 <div class="app"><aside><div class="brand"><span class="logo" id="lg"></span>Drip House</div><nav id="nav"></nav></aside>
 <div class="main"><header><input id="q" type="search" placeholder="Search products…" aria-label="Search products"><span class="sp"></span>
 <button class="b ghost" id="theme" aria-label="Switch light or dark">Light / Dark</button><button class="b ghost" id="out">Sign out</button></header><main id="view"></main></div></div>
+<div id="modal"></div>
 <div id="toast" role="status"></div>
 <script>
 const $=(s,e=document)=>e.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const money=n=>Number(n).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})+' L.E.';
 const kmoney=n=>(n>=1e5?(n/1e3).toFixed(1)+'K':Number(n).toLocaleString('en',{maximumFractionDigits:0}))+' L.E.';
-const IC={grid:'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z',cart:'M3 4h2l2.5 11h10L20 7H6.5M9 20h.01M17 20h.01',wrench:'M14.7 6.3a4 4 0 00-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 005.4-5.4l-2.5 2.5-2.2-.6-.6-2.2z',users:'M16 20v-1a4 4 0 00-4-4H7a4 4 0 00-4 4v1M9.5 11a3.5 3.5 0 100-7 3.5 3.5 0 000 7M21 20v-1a4 4 0 00-3-3.9M16 4.1a3.5 3.5 0 010 6.8',box:'M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8',chart:'M4 20V10M10 20V4M16 20v-7M22 20H2',drop:'M12 2s6 7 6 12a6 6 0 01-12 0c0-5 6-12 6-12z'};
+const IC={grid:'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z',cart:'M3 4h2l2.5 11h10L20 7H6.5M9 20h.01M17 20h.01',wrench:'M14.7 6.3a4 4 0 00-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 005.4-5.4l-2.5 2.5-2.2-.6-.6-2.2z',users:'M16 20v-1a4 4 0 00-4-4H7a4 4 0 00-4 4v1M9.5 11a3.5 3.5 0 100-7 3.5 3.5 0 000 7M21 20v-1a4 4 0 00-3-3.9M16 4.1a3.5 3.5 0 010 6.8',box:'M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8',chart:'M4 20V10M10 20V4M16 20v-7M22 20H2',store:'M3 9l1.5-5h15L21 9M3 9v11h18V9M3 9a3 3 0 006 0 3 3 0 006 0 3 3 0 006 0M9 20v-6h6v6',drop:'M12 2s6 7 6 12a6 6 0 01-12 0c0-5 6-12 6-12z'};
 const ico=(n,s=18)=>`<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${IC[n]}"/></svg>`;
 $('#lg').innerHTML=ico('drop',20);
-const TABS={overview:['Overview','grid'],sales:['Sales','cart'],repairs:['Repairs','wrench'],customers:['Customers','users'],inventory:['Inventory','box'],report:['Reports','chart']};
+const TABS={overview:['Overview','grid'],shop:['Shop','store'],sales:['Sales','cart'],repairs:['Repairs','wrench'],customers:['Customers','users'],inventory:['Inventory','box'],report:['Reports','chart']};
 const STATUS=['received','diagnosing','repairing','ready','collected'];
 const LABEL={disposable:'Disposables',pod:'Pods','e-liquid':'E-liquid','egyptian e-liquid':'Egyptian',coil:'Coils',accessory:'Accessories'};
-let S={tab:'overview',products:[],customers:[],repairs:[],sales:[],cart:{},sum:{low_stock:[]},report:{items:[],categories:[],totals:{}},dash:{days:[],sales:[],cost:[],profit:[],totals:{},categories:[],activity:[]},q:'',rng:{},cat:'',find:''};
+let S={tab:'overview',products:[],customers:[],repairs:[],sales:[],cart:{},sum:{low_stock:[]},report:{items:[],categories:[],totals:{}},dash:{days:[],sales:[],cost:[],profit:[],totals:{},categories:[],activity:[]},q:'',rng:{},cat:'',shopCat:'',find:''};
 function theme(t){document.documentElement.dataset.theme=t;try{localStorage.theme=t}catch(e){}}
 theme((()=>{try{return localStorage.theme}catch(e){}})()||'dark');
 let MEM='';/* token kept in memory too, in case the browser blocks storage */
@@ -96,7 +112,7 @@ async function act(fn,ok){try{await fn();if(ok)toast(ok);await load()}catch(e){t
 async function load(){[S.products,S.customers,S.repairs,S.sales,S.sum,S.report,S.dash]=await Promise.all(['products','customers','repairs','sales','summary','report','dashboard'].map(k=>api('GET','/api/'+k+(k=='report'?S.q:''))));render()}
 const ago=s=>{const m=(Date.now()-new Date(s.replace(' ','T')+'Z'))/6e4;return m<1?'just now':m<60?Math.floor(m)+' min ago':m<1440?Math.floor(m/60)+' h ago':Math.floor(m/1440)+' d ago'};
 const when=s=>new Date(s.replace(' ','T')+'Z').toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'});
-const fp=()=>S.products.filter(p=>(!S.cat||p.category==S.cat)&&(!S.find||(p.name+' '+p.sku).toLowerCase().includes(S.find)));
+const fp=(cat=S.cat)=>S.products.filter(p=>(!cat||(cat=='__new'?p.is_new:p.category==cat))&&(!S.find||(p.name+' '+p.sku).toLowerCase().includes(S.find)));
 const lvl=p=>{const w=Math.min(100,p.stock/Math.max(p.low_stock*4,20)*100),c=p.stock<=p.low_stock?'c2':p.stock<=p.low_stock*2?'c3':'c4';return `<span class="lvl"><i style="width:${w}%;background:var(--${c})"></i></span><span class="num ${p.stock<=p.low_stock?'low':''}">${p.stock}</span>`};
 function lineChart(labels,series){const W=640,H=230,L=48,R=12,T=10,B=26,n=labels.length,mx=Math.max(1000,...series.flatMap(s=>s.v)),p=10**Math.floor(Math.log10(mx)),nm=[1,2,4,8,10].map(k=>k*p).find(v=>v>=mx),x=i=>L+i*(W-L-R)/(n-1),y=v=>T+(H-T-B)*(1-v/nm),f=v=>v>=1000?(v/1000)+'K':v;let g='';
  for(let k=0;k<=4;k++){const v=nm*k/4;g+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" class="gl"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end">${f(Math.round(v))}</text>`}
@@ -106,6 +122,22 @@ function barChart(cs){if(!cs.length)return '<p style="color:var(--mute)">No prod
  for(let k=0;k<=4;k++){const yy=T+(H-T-B)*(1-k/4);g+=`<line x1="${L}" x2="${W-6}" y1="${yy}" y2="${yy}" class="gl"/><text x="${L-6}" y="${yy+4}" text-anchor="end">${Math.round(nm*k/4)}</text>`}
  cs.forEach((c,i)=>{const h=(H-T-B)*c.units/nm,cx=L+step*i+step/2;g+=`<rect x="${cx-bw/2}" y="${H-B-h}" width="${bw}" height="${h}" rx="3" style="fill:var(--${cl[i%5]})"/><text x="${cx}" y="${H-B-h-4}" text-anchor="middle">${c.units}</text><text x="${cx}" y="${H-B+16}" text-anchor="middle">${esc(LABEL[c.category]||c.category)}</text>`});
  return `<svg viewBox="0 0 ${W} ${H}" class="ch" role="img" aria-label="Units sold per category">${g}</svg>`}
+const CC={disposable:'c5',pod:'c1','e-liquid':'c4','egyptian e-liquid':'c3',coil:'c2',accessory:'c1'};
+const imgSrc=p=>!p.image?'':p.image.startsWith('/img/')?(BASE||'')+p.image:p.image;
+async function shrink(file,max=640){const url=URL.createObjectURL(file);
+ try{const img=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=()=>no(Error('That file is not an image the browser can read. Try a JPG or PNG.'));i.src=url});
+  const k=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);
+  const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0,c.width,c.height);return c.toDataURL('image/jpeg',.82)}
+ finally{URL.revokeObjectURL(url)}}
+const photoField=(cur)=>`<label>Photo<input name="photo" type="file" accept="image/*"></label><img class="pv" alt="Photo preview" ${cur?`src="${esc(cur)}"`:'hidden'}>`;
+function editView(p){$('#modal').innerHTML=`<div class="ov" data-close><form id="edit" class="pan md" data-id="${p.id}"><h3>Edit product</h3>
+ <label>Name<input name="name" value="${esc(p.name)}" required></label>
+ <div class="row"><label style="flex:1">Selling price<input name="price" type="number" step="0.01" min="0" value="${p.price}" required></label><label style="flex:1">Cost (what we pay)<input name="cost" type="number" step="0.01" min="0" value="${p.cost}" required></label></div>
+ ${photoField(imgSrc(p))}${p.image?'<label class="row"><input name="rmphoto" type="checkbox"> Remove current photo</label>':''}
+ <label class="row"><input name="is_new" type="checkbox" ${p.is_new?'checked':''}> Show the “New” badge</label>
+ <div class="row" style="justify-content:flex-end"><button type="button" class="b ghost" data-close>Cancel</button><button class="b">Save changes</button></div></form></div>`;
+ $('#modal input[name=name]').focus()}
+const closeModal=()=>{$('#modal').innerHTML=''};
 function render(){document.body.classList.remove('login');
  $('#nav').innerHTML=Object.entries(TABS).map(([k,[v,i]])=>`<button data-t="${k}" ${S.tab==k?'aria-current="page"':''}>${ico(i)}${v}${k=='inventory'&&S.sum.low_stock.length?`<span class="pill">${S.sum.low_stock.length}</span>`:''}</button>`).join('');
  $('#view').innerHTML=`<h1 class="pt">${TABS[S.tab][0]}</h1>`+VIEWS[S.tab]()}
@@ -117,6 +149,15 @@ overview(){const D=S.dash,T=D.totals;
  <section class="pan"><h3>Top selling by category (units)</h3>${barChart(D.categories)}</section></div>
  <div class="two"><section class="pan wrap"><div class="ph"><h3>Product list (stock status)</h3>${catSel()}</div><table><tr><th>Product<th>SKU<th>Category<th>Price<th>Stock level</tr>${fp().map(p=>`<tr><td>${esc(p.name)}<td class="num">${esc(p.sku)}<td>${esc(p.category)}<td class="num">${money(p.price)}<td>${lvl(p)}`).join('')||'<tr><td colspan=5>No products found.'}</table></section>
  <section class="pan"><h3>Recent activity</h3>${D.activity.map(a=>`<div class="fd"><i class="dot ${a.kind}"></i><div>${esc(a.text)}<small>${ago(a.at)}</small></div></div>`).join('')||'<p style="color:var(--mute)">Nothing yet. Sales and repairs will show here.</p>'}</section></div>`},
+shop(){const cats=[...new Set(S.products.map(p=>p.category))],list=fp(S.shopCat),
+ chips=[['','All',S.products.length],['__new','New',S.products.filter(p=>p.is_new).length],...cats.map(c=>[c,LABEL[c]||c,S.products.filter(p=>p.category==c).length])],
+ it=Object.entries(S.cart).filter(([,q])=>q>0),n=it.reduce((a,[,q])=>a+q,0),t=it.reduce((a,[id,q])=>a+q*S.products.find(p=>p.id==id).price,0);
+ return `<div class="chips">${chips.map(([v,l,c])=>`<button class="chip" data-chip="${esc(v)}" ${S.shopCat==v?'aria-pressed="true"':''}>${esc(l)}<small>${c}</small></button>`).join('')}</div>
+ ${S.products.length&&!S.products.some(p=>p.image)?'<p style="color:var(--mute);margin:-6px 0 14px">No photos yet. Press <b>Edit</b> on a product to add its picture.</p>':''}
+ <div class="shop">${list.map(p=>{const src=imgSrc(p);return `<article class="pc ${p.stock?'':'so'}"><div class="pi"><span style="color:color-mix(in srgb,var(--${CC[p.category]||'c1'}) 70%,transparent)">${ico('drop',54)}</span>${src?`<img src="${esc(src)}" alt="${esc(p.name)}" loading="lazy" onerror="this.remove()">`:''}${p.is_new?'<span class="bd new">New</span>':''}${p.stock<1?'<span class="bd out">Sold out</span>':p.stock<=p.low_stock?`<span class="bd low">Only ${p.stock} left</span>`:''}</div>
+  <div class="pb"><small>${esc(LABEL[p.category]||p.category)}</small><div class="pn">${esc(p.name)}</div><div class="pp num">${money(p.price)}</div>
+  <div class="row"><button class="b" style="flex:1" data-add="${p.id}" ${p.stock?'':'disabled'}>Add to sale</button><button class="b ghost" data-edit="${p.id}" aria-label="Edit ${esc(p.name)}">Edit</button></div></div></article>`}).join('')||'<p style="color:var(--mute)">No products match.</p>'}</div>
+ ${n?`<div class="cartbar"><span><b>${n}</b> item${n>1?'s':''}, <b class="num">${money(t)}</b></span><button class="b" data-t="sales">Go to checkout</button></div>`:''}`},
 sales(){const items=Object.entries(S.cart).filter(([,q])=>q>0),total=items.reduce((t,[id,q])=>t+q*S.products.find(p=>p.id==id).price,0);
  return `<div class="two"><section class="pan wrap"><div class="ph"><h3>Products</h3>${catSel()}</div><table><tr><th>Item<th>Price<th>Stock<th></tr>${fp().map(p=>`<tr><td>${esc(p.name)}<td class="num">${money(p.price)}<td class="num ${p.stock<=p.low_stock?'low':''}">${p.stock}<td><button class="b ghost" data-add="${p.id}" ${p.stock?'':'disabled'}>Add</button>`).join('')}</table></section>
  <section class="pan"><h3>Current sale</h3>${items.length?items.map(([id,q])=>`<div class="row" style="justify-content:space-between;margin-bottom:6px"><span>${esc(S.products.find(p=>p.id==id).name)} × ${q}</span><button class="b ghost" data-rm="${id}" aria-label="Remove one">−</button></div>`).join(''):'<p style="color:var(--mute)">Add products from the list to start a sale.</p>'}
@@ -128,32 +169,38 @@ repairs(){return `<section class="pan" style="margin-bottom:14px"><h3>Book in a 
  <div class="board">${STATUS.map(s=>{const t=S.repairs.filter(r=>r.status==s);return `<div class="col" data-s="${s}"><h3>${s[0].toUpperCase()+s.slice(1)}<span class="num">${t.length}</span></h3>${t.map(r=>`<div class="tk"><b>${esc(r.device)}</b><small>${esc(r.issue)}</small><small>${esc(r.customer)} · ${money(r.quote)}</small><select data-rs="${r.id}" aria-label="Status">${STATUS.map(x=>`<option ${x==r.status?'selected':''}>${x}</option>`).join('')}</select></div>`).join('')}</div>`}).join('')}</div>`},
 customers(){return `<div class="two"><section class="pan wrap"><h3>Customers</h3><table><tr><th>Name<th>Phone<th>Date of birth<th>ID</tr>${S.customers.map(c=>`<tr><td>${esc(c.name)}<td>${esc(c.phone)}<td class="num">${esc(c.dob)}<td>${c.id_checked?'Checked':'<b class="low">Not checked</b>'}`).join('')||'<tr><td colspan=4>No customers yet.'}</table></section>
  <section class="pan"><h3>New customer</h3><p style="color:var(--mute);margin:0 0 8px">Customers under ${S.sum.min_age} cannot be registered.</p><form id="customer"><label>Name<input name="name" required></label><label>Phone<input name="phone"></label><label>Date of birth<input name="dob" type="date" required></label><label class="row"><input name="id_checked" type="checkbox"> I checked photo ID</label><button class="b">Save customer</button></form></section></div>`},
-inventory(){return `<div class="two"><section class="pan wrap"><div class="ph"><h3>Inventory</h3>${catSel()}</div><table><tr><th>Name<th>Category<th>Cost<th>Price<th>In stock<th>Update (cost, price, add stock)</tr>${fp().map(p=>`<tr><td>${esc(p.name)}<td>${esc(p.category)}<td class="num">${money(p.cost)}<td class="num">${money(p.price)}<td>${lvl(p)}<td><form class="row restock" data-id="${p.id}"><input name="cost" type="number" step="0.01" min="0" value="${p.cost}" style="width:80px" aria-label="Cost"><input name="price" type="number" step="0.01" min="0" value="${p.price}" style="width:80px" aria-label="Price"><input name="add" type="number" value="0" style="width:70px" aria-label="Add stock"><button class="b ghost">Save</button></form>`).join('')}</table></section>
- <section class="pan"><h3>New product</h3><form id="product"><label>Name<input name="name" required></label><label>SKU<input name="sku" required></label><label>Category<select name="category"><option>disposable<option>pod<option>e-liquid<option>egyptian e-liquid<option>coil<option>accessory</select></label><label>Cost (what we pay)<input name="cost" type="number" step="0.01" min="0" required></label><label>Selling price<input name="price" type="number" step="0.01" min="0" required></label><label>Quantity we have<input name="stock" type="number" min="0" value="0"></label><button class="b">Save product</button></form></section></div>`},
+inventory(){return `<div class="two"><section class="pan wrap"><div class="ph"><h3>Inventory</h3>${catSel()}</div><table><tr><th>Name<th>Category<th>In stock<th>Add stock</tr>${fp().map(p=>`<tr><td>${esc(p.name)}<td>${esc(p.category)}<td>${lvl(p)}<td><form class="row restock" data-id="${p.id}"><input name="add" type="number" value="0" style="width:80px" aria-label="Add stock for ${esc(p.name)}"><button class="b ghost">Save</button></form>`).join('')}</table></section>
+ <section class="pan"><h3>New product</h3><form id="product"><label>Name<input name="name" required></label><label>SKU<input name="sku" required></label><label>Category<select name="category"><option>disposable<option>pod<option>e-liquid<option>egyptian e-liquid<option>coil<option>accessory</select></label><label>Cost (what we pay)<input name="cost" type="number" step="0.01" min="0" required></label><label>Selling price<input name="price" type="number" step="0.01" min="0" required></label><label>Quantity we have<input name="stock" type="number" min="0" value="0"></label>${photoField('')}<label>Or photo link<input name="image" type="url" placeholder="https://"></label><label class="row"><input name="is_new" type="checkbox"> Show the “New” badge</label><button class="b">Save product</button></form></section></div>`},
 report(){const R=S.report,T=R.totals;return `<section class="pan" style="margin-bottom:14px"><form id="range" class="row" style="flex-wrap:wrap"><label>From<input type="date" name="from" value="${S.rng.from||''}"></label><label>To<input type="date" name="to" value="${S.rng.to||''}"></label><button class="b">Show</button></form></section>
  <div class="kpis">${[['Items sold',T.sold],['Revenue',money(T.revenue||0)],['Profit',money(T.profit||0)],['Stock value at cost',money(T.stock_value||0)]].map(([a,b])=>`<div class="kpi"><div><small>${a}</small><b>${b}</b></div></div>`).join('')}</div>
  <div class="two"><section class="pan wrap"><h3>Sold per product</h3><table><tr><th>Product<th>Sold<th>Revenue<th>Profit<th>Left</tr>${R.items.map(r=>`<tr><td>${esc(r.name)}<td class="num">${r.sold}<td class="num">${money(r.revenue)}<td class="num">${money(r.profit)}<td class="num">${r.stock}`).join('')}<tr><th>Total<th class="num">${T.sold}<th class="num">${money(T.revenue||0)}<th class="num">${money(T.profit||0)}<th class="num">${T.stock_units}</tr></table></section>
  <section class="pan wrap"><h3>By category</h3><table><tr><th>Category<th>Sold<th>Revenue</tr>${R.categories.map(r=>`<tr><td>${esc(r.category)}<td class="num">${r.sold}<td class="num">${money(r.revenue)}`).join('')}</table></section></div>`}};
-document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;
+document.addEventListener('click',e=>{if(e.target.classList.contains('ov'))return closeModal();const t=e.target.closest('button');if(!t)return;
  if(t.dataset.t){S.tab=t.dataset.t;render()}
- if(t.dataset.add){S.cart[t.dataset.add]=(S.cart[t.dataset.add]||0)+1;render()}
+ if(t.dataset.add){const p=S.products.find(x=>x.id==t.dataset.add),n=S.cart[p.id]||0;if(n<p.stock){S.cart[p.id]=n+1;render()}else toast('Only '+p.stock+' in stock',1)}
+ if(t.dataset.chip!==undefined){S.shopCat=t.dataset.chip;render()}
+ if(t.dataset.edit)editView(S.products.find(p=>p.id==t.dataset.edit));
+ if(t.dataset.close!==undefined)closeModal();
  if(t.dataset.rm){S.cart[t.dataset.rm]--;render()}
  if(t.id=='theme')theme(document.documentElement.dataset.theme=='light'?'dark':'light');
  if(t.id=='out'){api('POST','/api/logout').catch(()=>{});clearT();loginView()}
  if(t.dataset.go)loginView(t.dataset.go);
  if(t.dataset.eye!==undefined){const i=t.previousElementSibling,show=i.type=='password';i.type=show?'text':'password';t.textContent=show?'Hide':'Show'}
  if(t.dataset.copy){navigator.clipboard?.writeText(t.dataset.copy).then(()=>toast('Recovery key copied'),()=>toast('Select the key and copy it by hand',1))}});
-document.addEventListener('change',e=>{const t=e.target;if(t.dataset.rs)act(()=>api('PUT','/api/repairs/'+t.dataset.rs,{status:t.value}),'Status updated');if(t.id=='catf'){S.cat=t.value;render()}});
-$('#q').addEventListener('input',e=>{S.find=e.target.value.trim().toLowerCase();if(getT()&&['overview','sales','inventory'].includes(S.tab))render()});
+document.addEventListener('keydown',e=>{if(e.key=='Escape')closeModal()});
+document.addEventListener('change',e=>{const t=e.target;
+ if(t.type=='file'){const pv=t.closest('form').querySelector('.pv'),f=t.files[0];if(pv&&f){pv.src=URL.createObjectURL(f);pv.hidden=false}}if(t.dataset.rs)act(()=>api('PUT','/api/repairs/'+t.dataset.rs,{status:t.value}),'Status updated');if(t.id=='catf'){S.cat=t.value;render()}});
+$('#q').addEventListener('input',e=>{S.find=e.target.value.trim().toLowerCase();if(getT()&&['overview','shop','sales','inventory'].includes(S.tab))render()});
 document.addEventListener('submit',e=>{e.preventDefault();const f=e.target,d=Object.fromEntries(new FormData(f));
  if(f.id=='sale')act(async()=>{const r=await api('POST','/api/sales',{customer_id:+d.customer_id,items:Object.entries(S.cart).filter(([,q])=>q>0).map(([id,q])=>({product_id:+id,qty:q}))});S.cart={};toast('Sale complete: '+money(r.total))});
  if(f.id=='repair')act(()=>api('POST','/api/repairs',d),'Device booked in');
- if(f.id=='product')act(()=>api('POST','/api/products',d),'Product saved');
+ if(f.id=='product')act(async()=>{const p={...d,is_new:d.is_new?1:0};if(p.photo&&p.photo.size)p.image=await shrink(p.photo);delete p.photo;await api('POST','/api/products',p)},'Product saved');
+ if(f.id=='edit')act(async()=>{const p={name:d.name,price:d.price,cost:d.cost,is_new:d.is_new?1:0};if(d.photo&&d.photo.size)p.image=await shrink(d.photo);else if(d.rmphoto)p.image='';await api('PUT','/api/products/'+f.dataset.id,p);closeModal()},'Product updated');
  if(f.id=='login'){LSset('remember',d.remember?'1':'0');act(async()=>{const r=await api('POST','/api/login',{password:d.password,remember:!!d.remember});setT(r.token,!!d.remember)})}
  if(f.id=='forgot'){if(d.password!==d.password2)return toast('The two passwords do not match',1);
   (async()=>{try{const r=await api('POST','/api/forgot',{key:d.key,password:d.password});loginView('done',r.recovery_key)}catch(e){toast(e.message,1)}})()}
  if(f.id=='range'){S.rng=d;S.q='?from='+d.from+'&to='+d.to;act(async()=>{},'Report updated')}
  if(f.id=='customer'){d.id_checked=!!d.id_checked;act(()=>api('POST','/api/customers',d),'Customer saved')}
- if(f.classList.contains('restock'))act(()=>api('PUT','/api/products/'+f.dataset.id,{add:+d.add,cost:d.cost,price:d.price}),'Stock updated')});
+ if(f.classList.contains('restock'))act(()=>api('PUT','/api/products/'+f.dataset.id,{add:+d.add}),'Stock updated')});
 (async()=>{if(!getT())return loginView();try{await load()}catch(e){loginView();if(getT())toast(e.message,1)}})();
 </script></body></html>
