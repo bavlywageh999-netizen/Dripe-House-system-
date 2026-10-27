@@ -1,10 +1,11 @@
 # Vape Workshop
 Storefront + shop/repair manager. Python 3.8+, no installs.
 
-    python app.py
-    Open: http://localhost:8000      (always open it this way, not by double-clicking index.html)
+**Windows:** double-click `start.bat`. Your browser opens by itself. Keep the black window open while you work.
+**Or:** run `python app.py` and open http://localhost:8000
 
-Keep `app.py` and `index.html` in the same folder (or put index.html in a `static/` folder).
+Keep `app.py`, `index.html` and `start.bat` in the same folder. `app.py` must be running for sign-in to work;
+if the page is opened another way (Live Server, a double-clicked file) it finds `app.py` on port 8000 by itself.
 Optional settings: MIN_AGE=18  PORT=9000  ADMIN_PASSWORD=yourpass. Data lives in workshop.db.
 
 ## Signing in

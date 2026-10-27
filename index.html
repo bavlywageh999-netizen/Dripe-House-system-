@@ -69,10 +69,11 @@ let MEM='';/* token kept in memory too, in case the browser blocks storage */
 const getT=()=>{try{return localStorage.t||sessionStorage.t||MEM}catch(e){return MEM}};
 const clearT=()=>{MEM='';try{localStorage.removeItem('t');sessionStorage.removeItem('t')}catch(e){}};
 const setT=(t,remember)=>{clearT();MEM=t;try{(remember?localStorage:sessionStorage).t=t}catch(e){}};
-async function api(m,u,b){let r,t;
- try{r=await fetch(u,{method:m,headers:{'Content-Type':'application/json','X-Token':getT()},body:b?JSON.stringify(b):undefined});t=await r.text()}
- catch(e){throw Error(location.protocol=='file:'?'Open the app at http://localhost:8000 after running "python app.py". It cannot work from a double-clicked file.':'Cannot reach the server. Check that app.py is running.')}
- let j;try{j=JSON.parse(t)}catch(e){throw Error('The server sent a reply the app cannot read (HTTP '+r.status+'). Open the app through app.py at http://localhost:8000, not through another web server.')}
+let BASE=null;/* where app.py lives; found automatically, so the page also works if opened from another local server or a file */
+async function api(m,u,b){let r,j;
+ for(const base of BASE!==null?[BASE]:(location.protocol=='file:'?[]:['']).concat(['http://localhost:8000','http://127.0.0.1:8000'])){
+  try{const x=await fetch(base+u,{method:m,headers:{'Content-Type':'application/json','X-Token':getT()},body:b?JSON.stringify(b):undefined});j=JSON.parse(await x.text());r=x;BASE=base;break}catch(e){}}
+ if(!r){BASE=null;throw Error('Cannot reach the shop server. Start it first: double-click start.bat (or run "python app.py"), then try again.')}
  if(r.status==401&&u!='/api/login'){clearT();loginView()}
  if(!r.ok)throw Error(j.error||'Request failed');return j}
 function loginView(mode='login',key=''){document.body.classList.add('login');

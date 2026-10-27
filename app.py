@@ -1,5 +1,5 @@
 """Vape shop + repair workshop system. Python 3 stdlib only: python app.py -> http://localhost:8000"""
-import hashlib, json, os, re, secrets, sqlite3, sys, time, traceback, datetime as dt
+import hashlib, json, os, re, secrets, sqlite3, sys, threading, time, traceback, webbrowser, datetime as dt
 from urllib.parse import urlsplit, parse_qs
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -270,6 +270,11 @@ class H(BaseHTTPRequestHandler):
     def send(self, code, body, ctype="application/json"):
         data = body if isinstance(body, bytes) else json.dumps(body).encode()
         self.send_response(code); self.send_header("Content-Type", ctype)
+        o = self.headers.get("Origin") or ""
+        if re.fullmatch(r"null|https?://(localhost|127\.0\.0\.1)(:\d+)?", o):  # only pages on this computer
+            self.send_header("Access-Control-Allow-Origin", o); self.send_header("Vary", "Origin")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Token")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
         self.send_header("Content-Length", str(len(data))); self.end_headers(); self.wfile.write(data)
 
     def handle_api(self, method):
@@ -298,6 +303,7 @@ class H(BaseHTTPRequestHandler):
             if os.path.isfile(p):
                 with open(p, "rb") as f: return self.send(200, f.read(), "text/html; charset=utf-8")
         self.send(500, b"index.html not found. Put it next to app.py (or in a 'static' folder).", "text/plain; charset=utf-8")
+    def do_OPTIONS(self): self.send(204, b"", "text/plain")
     def do_POST(self): self.handle_api("POST")
     def do_PUT(self): self.handle_api("PUT")
     def log_message(self, *a): pass
@@ -314,5 +320,8 @@ def cli_reset():
 if __name__ == "__main__":
     if sys.argv[1:] == ["reset-password"]: sys.exit(cli_reset())
     init(); port = int(os.environ.get("PORT", 8000))
-    print(f"Shop system running: http://localhost:{port}  (minimum age {MIN_AGE})")
-    ThreadingHTTPServer((os.environ.get("HOST", "127.0.0.1"), port), H).serve_forever()
+    try: srv = ThreadingHTTPServer((os.environ.get("HOST", "127.0.0.1"), port), H)
+    except OSError: sys.exit(f"Port {port} is already in use. The shop system may already be running (try http://localhost:{port}),\nor start it on another port:  set PORT=9000  then  python app.py")
+    print(f"Shop system running: http://localhost:{port}  (minimum age {MIN_AGE}). Keep this window open; close it to stop.")
+    if not os.environ.get("NO_BROWSER"): threading.Timer(1, webbrowser.open, (f"http://localhost:{port}",)).start()
+    srv.serve_forever()
