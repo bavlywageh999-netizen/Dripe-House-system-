@@ -1,13 +1,15 @@
 """Vape shop + repair workshop system. Python 3 stdlib only: python app.py -> http://localhost:8000"""
-import json, os, re, secrets, sqlite3, datetime as dt
+import hashlib, json, os, re, secrets, sqlite3, sys, time, traceback, datetime as dt
 from urllib.parse import urlsplit, parse_qs
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 DB = os.environ.get("DB_PATH", "workshop.db")
 MIN_AGE = int(os.environ.get("MIN_AGE", 21))  # legal age in your country
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Bisho@Vap2026")  # override with the ADMIN_PASSWORD env var
+LEGACY_PASSWORD = "Bisho@Vap2026"  # only used on the very first start if ADMIN_PASSWORD is not set; change it!
+SESSION_HOURS, REMEMBER_DAYS = 12, 30
+PUBLIC = {"/api/login", "/api/forgot"}  # everything else needs a valid session
+ATTEMPTS = {}  # ip -> (failed count, window start)
 CURRENCY = "L.E."
-TOKENS = set()
 STATUSES = ["received", "diagnosing", "repairing", "ready", "collected"]
 
 SCHEMA = """
@@ -31,12 +33,68 @@ CREATE TABLE IF NOT EXISTS repairs(
   device TEXT NOT NULL, issue TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'received',
   quote REAL DEFAULT 0, notes TEXT DEFAULT '', created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, expires_at TEXT NOT NULL);
 """
 SEED = [("DS-001", "Disposable 9000 puffs - Mixed Berry", "disposable", 450, 300, 20, 1), ("DS-002", "Disposable 12000 puffs - Watermelon Ice", "disposable", 550, 380, 15, 1),
         ("PD-101", "Pod kit 800mAh", "pod", 1200, 800, 8, 1), ("PD-102", "Pod cartridge 2ml (2 pack)", "pod", 250, 150, 25, 0),
         ("EL-001", "Nic salt 30ml - Mango Ice", "e-liquid", 350, 220, 24, 0), ("EL-002", "Freebase 60ml - Tobacco", "e-liquid", 500, 320, 3, 0),
         ("EG-001", "Egyptian salt 30ml - Apple Double", "egyptian e-liquid", 200, 120, 18, 1), ("CL-201", "Mesh coil 0.6 ohm (5 pack)", "coil", 300, 180, 30, 0),
         ("AC-301", "18650 battery 3000mAh", "accessory", 250, 150, 12, 0)]
+
+# ---------- authentication ----------
+def hash_pw(pw, salt=None):
+    salt = salt or secrets.token_bytes(16)
+    return salt.hex() + "$" + hashlib.pbkdf2_hmac("sha256", pw.encode(), salt, 200_000).hex()
+
+def verify_pw(pw, stored):
+    try: return secrets.compare_digest(hash_pw(pw, bytes.fromhex(stored.split("$")[0])), stored)
+    except ValueError: return False
+
+def get_set(c, k):
+    r = c.execute("SELECT value FROM settings WHERE key=?", (k,)).fetchone(); return r[0] if r else None
+
+def put_set(c, k, v): c.execute("INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)", (k, v))
+
+def norm_key(k): return re.sub(r"[^0-9A-Z]", "", str(k or "").upper())
+
+def new_recovery(c):
+    key = "-".join(secrets.token_hex(2).upper() for _ in range(4))
+    put_set(c, "recovery", hash_pw(norm_key(key))); return key
+
+def now_utc(delta=None):
+    t = dt.datetime.now(dt.timezone.utc) + (delta or dt.timedelta())
+    return t.strftime("%Y-%m-%d %H:%M:%S")
+
+def tok_hash(t): return hashlib.sha256(t.encode()).hexdigest()
+
+def new_session(c, remember):
+    tok = secrets.token_hex(32)
+    exp = now_utc(dt.timedelta(days=REMEMBER_DAYS) if remember else dt.timedelta(hours=SESSION_HOURS))
+    c.execute("INSERT INTO sessions(token,expires_at) VALUES(?,?)", (tok_hash(tok), exp)); return tok, exp
+
+def valid_session(c, tok):
+    c.execute("DELETE FROM sessions WHERE expires_at<?", (now_utc(),))
+    return bool(tok) and c.execute("SELECT 1 FROM sessions WHERE token=?", (tok_hash(tok),)).fetchone() is not None
+
+def throttle(ip):
+    n, t0 = ATTEMPTS.get(ip, (0, time.time()))
+    if time.time() - t0 > 600: ATTEMPTS.pop(ip, None)
+    elif n >= 8: raise Err("Too many failed attempts. Wait 10 minutes and try again.", 429)
+
+def failed(ip):
+    n, t0 = ATTEMPTS.get(ip, (0, time.time()))
+    if time.time() - t0 > 600: n, t0 = 0, time.time()
+    ATTEMPTS[ip] = (n + 1, t0)
+
+def ensure_password(c):
+    """First start: store the password hashed and print a one-time recovery key."""
+    if get_set(c, "password"): return
+    env = os.environ.get("ADMIN_PASSWORD")
+    put_set(c, "password", hash_pw(env or LEGACY_PASSWORD))
+    print("\n*** First start: sign-in password saved (hashed) ***")
+    if not env: print(f"*** WARNING: using the old default password '{LEGACY_PASSWORD}'. Change it: python app.py reset-password ***")
+    print(f"*** RECOVERY KEY (write it down, shown only once): {new_recovery(c)} ***\n")
 
 def db():
     c = sqlite3.connect(DB); c.row_factory = sqlite3.Row
@@ -50,6 +108,7 @@ def init():
             if col not in [r[1] for r in c.execute(f"PRAGMA table_info({t})")]: c.execute(f"ALTER TABLE {t} ADD COLUMN {col} {ddl}")
         if not c.execute("SELECT 1 FROM products").fetchone():
             c.executemany("INSERT INTO products(sku,name,category,price,cost,stock,is_new) VALUES(?,?,?,?,?,?,?)", SEED)
+        ensure_password(c)
 
 class Err(Exception):
     def __init__(s, msg, code=400): s.msg, s.code = msg, code
@@ -124,8 +183,26 @@ def dashboard(c, b):
             "totals": {"revenue": rev, "orders": orders, "avg": rev / orders if orders else 0}, "categories": cats, "activity": ev[:8]}
 
 def login(c, b):
-    if not secrets.compare_digest(str(b.get("password", "")), ADMIN_PASSWORD): raise Err("Wrong password", 401)
-    tok = secrets.token_hex(16); TOKENS.add(tok); return {"token": tok}
+    ip = b["_ip"]; throttle(ip)
+    if not verify_pw(str(b.get("password", "")), get_set(c, "password") or ""):
+        failed(ip); raise Err("Wrong password", 401)
+    ATTEMPTS.pop(ip, None)
+    tok, exp = new_session(c, bool(b.get("remember")))
+    return {"token": tok, "expires": exp}
+
+def logout(c, b):
+    c.execute("DELETE FROM sessions WHERE token=?", (tok_hash(b["_tok"]),)); return {"ok": True}
+
+def forgot(c, b):
+    """Reset the password with the recovery key. Signs everyone out and issues a new recovery key."""
+    ip = b["_ip"]; throttle(ip)
+    new = str(b.get("password", ""))
+    if len(new) < 8: raise Err("New password must be at least 8 characters")
+    if not verify_pw(norm_key(b.get("key")), get_set(c, "recovery") or ""):
+        failed(ip); raise Err("That recovery key is not correct", 403)
+    ATTEMPTS.pop(ip, None)
+    put_set(c, "password", hash_pw(new)); c.execute("DELETE FROM sessions")
+    return {"recovery_key": new_recovery(c)}
 
 def add_customer(c, b):
     need(b, "name", "dob")
@@ -175,6 +252,8 @@ ROUTES = [
  ("GET", r"/api/report", report),
  ("GET", r"/api/dashboard", dashboard),
  ("POST", r"/api/login", login),
+ ("POST", r"/api/logout", logout),
+ ("POST", r"/api/forgot", forgot),
  ("GET", r"/api/customers", lambda c, b: rows(c, "SELECT id,name,phone,dob,id_checked FROM customers ORDER BY name")),
  ("POST", r"/api/customers", add_customer),
  ("GET", r"/api/sales", lambda c, b: rows(c, """SELECT s.id,s.total,s.created_at,cu.name customer,
@@ -194,30 +273,46 @@ class H(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data))); self.end_headers(); self.wfile.write(data)
 
     def handle_api(self, method):
-        path = self.path.split("?")[0]
-        if path != "/api/login" and self.headers.get("X-Token") not in TOKENS:
-            return self.send(401, {"error": "Please sign in"})
-        for m, rx, fn in ROUTES:
-            mt = re.fullmatch(rx, path)
-            if m == method and mt:
-                try:
+        path, tok = self.path.split("?")[0], self.headers.get("X-Token") or ""
+        try:
+            with db() as c:
+                if path not in PUBLIC and not valid_session(c, tok): return self.send(401, {"error": "Please sign in"})
+            for m, rx, fn in ROUTES:
+                mt = re.fullmatch(rx, path)
+                if m == method and mt:
                     n = int(self.headers.get("Content-Length") or 0)
                     body = json.loads(self.rfile.read(n) or b"{}") if n else {}
                     if method == "GET": body = {k: v[0] for k, v in parse_qs(urlsplit(self.path).query).items()}
+                    if not isinstance(body, dict): raise Err("Invalid input")
+                    body["_ip"], body["_tok"] = self.client_address[0], tok
                     with db() as c: return self.send(200, fn(c, body, *mt.groups()))
-                except Err as e: return self.send(e.code, {"error": e.msg})
-                except (ValueError, KeyError, TypeError): return self.send(400, {"error": "Invalid input"})
-        self.send(404, {"error": "Not found"})
+            self.send(404, {"error": "Not found"})
+        except Err as e: self.send(e.code, {"error": e.msg})
+        except (ValueError, KeyError, TypeError): self.send(400, {"error": "Invalid input"})
+        except Exception: traceback.print_exc(); self.send(500, {"error": "Server error. See the server window for details."})
 
     def do_GET(self):
         if self.path.startswith("/api/"): return self.handle_api("GET")
-        with open(os.path.join(os.path.dirname(__file__), "static", "index.html"), "rb") as f:
-            self.send(200, f.read(), "text/html; charset=utf-8")
+        here = os.path.dirname(os.path.abspath(__file__))
+        for p in (os.path.join(here, "static", "index.html"), os.path.join(here, "index.html")):
+            if os.path.isfile(p):
+                with open(p, "rb") as f: return self.send(200, f.read(), "text/html; charset=utf-8")
+        self.send(500, b"index.html not found. Put it next to app.py (or in a 'static' folder).", "text/plain; charset=utf-8")
     def do_POST(self): self.handle_api("POST")
     def do_PUT(self): self.handle_api("PUT")
     def log_message(self, *a): pass
 
+def cli_reset():
+    import getpass
+    init()
+    pw = getpass.getpass("New password (at least 8 characters): ")
+    if len(pw) < 8 or pw != getpass.getpass("Repeat new password: "): sys.exit("Passwords did not match or are too short. Nothing changed.")
+    with db() as c:
+        put_set(c, "password", hash_pw(pw)); c.execute("DELETE FROM sessions")
+        print(f"Password changed. New recovery key (write it down): {new_recovery(c)}")
+
 if __name__ == "__main__":
+    if sys.argv[1:] == ["reset-password"]: sys.exit(cli_reset())
     init(); port = int(os.environ.get("PORT", 8000))
     print(f"Shop system running: http://localhost:{port}  (minimum age {MIN_AGE})")
     ThreadingHTTPServer((os.environ.get("HOST", "127.0.0.1"), port), H).serve_forever()

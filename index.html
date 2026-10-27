@@ -40,6 +40,12 @@ form{display:grid;gap:8px}label{font-size:12px;color:var(--mute);display:grid;ga
 .tk small{color:var(--mute);display:block}.tk select{width:100%;margin-top:6px}
 #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;display:none}#toast.err{background:var(--c2);color:#fff}
 body.login aside,body.login header{display:none}body.login .app{grid-template-columns:1fr}
+.lg-card{max-width:340px;margin:12vh auto 0}.lg-card input{font-size:16px}.lg-card h2{font-size:16px;margin:0 0 4px}.lg-card p{margin:0 0 10px;color:var(--mute);font-size:13px}
+.pw{position:relative;display:grid}.pw input{padding-right:64px}.pw button{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--mute);font:500 12px Inter,sans-serif;padding:6px 8px;cursor:pointer;border-radius:6px}.pw button:hover{color:var(--ink)}
+.opts{display:flex;justify-content:space-between;align-items:center;gap:8px}.opts label{display:flex;flex-direction:row;align-items:center;gap:7px;color:var(--ink);font-size:13px}
+.link{background:none;border:0;padding:4px 0;color:var(--acc);font:500 13px Inter,sans-serif;cursor:pointer}.link:hover{text-decoration:underline}
+.sr{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+.key{font:600 18px ui-monospace,Menlo,Consolas,monospace;letter-spacing:.08em;background:var(--pan2);border:1px dashed var(--line);border-radius:8px;padding:12px;text-align:center;user-select:all}
 @media(max-width:900px){.app{grid-template-columns:1fr}aside{flex-direction:row;align-items:center;overflow-x:auto;padding:8px}nav{flex-direction:row}.kpis{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}
 </style></head><body>
 <div class="app"><aside><div class="brand"><span class="logo" id="lg"></span>Drip House</div><nav id="nav"></nav></aside>
@@ -59,9 +65,31 @@ const LABEL={disposable:'Disposables',pod:'Pods','e-liquid':'E-liquid','egyptian
 let S={tab:'overview',products:[],customers:[],repairs:[],sales:[],cart:{},sum:{low_stock:[]},report:{items:[],categories:[],totals:{}},dash:{days:[],sales:[],cost:[],profit:[],totals:{},categories:[],activity:[]},q:'',rng:{},cat:'',find:''};
 function theme(t){document.documentElement.dataset.theme=t;try{localStorage.theme=t}catch(e){}}
 theme((()=>{try{return localStorage.theme}catch(e){}})()||'dark');
-async function api(m,u,b){const r=await fetch(u,{method:m,headers:{'Content-Type':'application/json','X-Token':sessionStorage.t||''},body:b?JSON.stringify(b):undefined});
- const j=await r.json();if(r.status==401&&u!='/api/login'){sessionStorage.removeItem('t');loginView()}if(!r.ok)throw Error(j.error||'Request failed');return j}
-function loginView(){document.body.classList.add('login');$('#view').innerHTML=`<section class="pan" style="max-width:340px;margin:12vh auto"><div class="brand" style="margin-bottom:14px"><span class="logo">${ico('drop',20)}</span>Drip House</div><form id="login"><label>Password<input name="password" type="password" required autofocus></label><button class="b">Sign in</button></form></section>`}
+let MEM='';/* token kept in memory too, in case the browser blocks storage */
+const getT=()=>{try{return localStorage.t||sessionStorage.t||MEM}catch(e){return MEM}};
+const clearT=()=>{MEM='';try{localStorage.removeItem('t');sessionStorage.removeItem('t')}catch(e){}};
+const setT=(t,remember)=>{clearT();MEM=t;try{(remember?localStorage:sessionStorage).t=t}catch(e){}};
+async function api(m,u,b){let r,t;
+ try{r=await fetch(u,{method:m,headers:{'Content-Type':'application/json','X-Token':getT()},body:b?JSON.stringify(b):undefined});t=await r.text()}
+ catch(e){throw Error(location.protocol=='file:'?'Open the app at http://localhost:8000 after running "python app.py". It cannot work from a double-clicked file.':'Cannot reach the server. Check that app.py is running.')}
+ let j;try{j=JSON.parse(t)}catch(e){throw Error('The server sent a reply the app cannot read (HTTP '+r.status+'). Open the app through app.py at http://localhost:8000, not through another web server.')}
+ if(r.status==401&&u!='/api/login'){clearT();loginView()}
+ if(!r.ok)throw Error(j.error||'Request failed');return j}
+function loginView(mode='login',key=''){document.body.classList.add('login');
+ const brand=`<div class="brand" style="margin-bottom:14px"><span class="logo">${ico('drop',20)}</span>Drip House</div>`;
+ const pwField=(name,label,ac,auto)=>`<label>${label}<span class="pw"><input name="${name}" type="password" autocomplete="${ac}" required minlength="${name=='password'&&mode=='login'?1:8}" ${auto?'autofocus':''}><button type="button" data-eye aria-label="Show or hide ${label.toLowerCase()}">Show</button></span></label>`;
+ const V={
+ login:`<form id="login"><input class="sr" name="username" value="admin" autocomplete="username" tabindex="-1" aria-hidden="true">${pwField('password','Password','current-password',1)}
+  <div class="opts"><label><input type="checkbox" name="remember" ${LS('remember')=='1'?'checked':''}> Remember me</label><button type="button" class="link" data-go="forgot">Forgot password?</button></div>
+  <button class="b">Sign in</button></form>`,
+ forgot:`<h2>Reset your password</h2><p>Enter the recovery key that was shown when the system first started. Lost it? On the shop computer, run <b>python app.py reset-password</b>.</p>
+  <form id="forgot"><label>Recovery key<input name="key" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" required autofocus></label>
+  ${pwField('password','New password','new-password')}${pwField('password2','Repeat new password','new-password')}
+  <button class="b">Reset password</button><button type="button" class="link" data-go="login">Back to sign in</button></form>`,
+ done:`<h2>Password changed</h2><p>You have been signed out everywhere. Your old recovery key no longer works. Write down the new one and keep it somewhere safe:</p>
+  <div class="key" id="newkey">${esc(key)}</div><div class="row" style="margin-top:12px"><button class="b" data-go="login">Go to sign in</button><button class="b ghost" type="button" data-copy="${esc(key)}">Copy key</button></div>`};
+ $('#view').innerHTML=`<section class="pan lg-card">${brand}${V[mode]}</section>`}
+const LS=k=>{try{return localStorage['pref_'+k]}catch(e){}},LSset=(k,v)=>{try{localStorage['pref_'+k]=v}catch(e){}};
 function toast(t,err){const e=$('#toast');e.textContent=t;e.className=err?'err':'';e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',3500)}
 async function act(fn,ok){try{await fn();if(ok)toast(ok);await load()}catch(e){toast(e.message,1)}}
 async function load(){[S.products,S.customers,S.repairs,S.sales,S.sum,S.report,S.dash]=await Promise.all(['products','customers','repairs','sales','summary','report','dashboard'].map(k=>api('GET','/api/'+k+(k=='report'?S.q:''))));render()}
@@ -110,16 +138,21 @@ document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)r
  if(t.dataset.add){S.cart[t.dataset.add]=(S.cart[t.dataset.add]||0)+1;render()}
  if(t.dataset.rm){S.cart[t.dataset.rm]--;render()}
  if(t.id=='theme')theme(document.documentElement.dataset.theme=='light'?'dark':'light');
- if(t.id=='out'){sessionStorage.removeItem('t');loginView()}});
+ if(t.id=='out'){api('POST','/api/logout').catch(()=>{});clearT();loginView()}
+ if(t.dataset.go)loginView(t.dataset.go);
+ if(t.dataset.eye!==undefined){const i=t.previousElementSibling,show=i.type=='password';i.type=show?'text':'password';t.textContent=show?'Hide':'Show'}
+ if(t.dataset.copy){navigator.clipboard?.writeText(t.dataset.copy).then(()=>toast('Recovery key copied'),()=>toast('Select the key and copy it by hand',1))}});
 document.addEventListener('change',e=>{const t=e.target;if(t.dataset.rs)act(()=>api('PUT','/api/repairs/'+t.dataset.rs,{status:t.value}),'Status updated');if(t.id=='catf'){S.cat=t.value;render()}});
-$('#q').addEventListener('input',e=>{S.find=e.target.value.trim().toLowerCase();if(sessionStorage.t&&['overview','sales','inventory'].includes(S.tab))render()});
+$('#q').addEventListener('input',e=>{S.find=e.target.value.trim().toLowerCase();if(getT()&&['overview','sales','inventory'].includes(S.tab))render()});
 document.addEventListener('submit',e=>{e.preventDefault();const f=e.target,d=Object.fromEntries(new FormData(f));
  if(f.id=='sale')act(async()=>{const r=await api('POST','/api/sales',{customer_id:+d.customer_id,items:Object.entries(S.cart).filter(([,q])=>q>0).map(([id,q])=>({product_id:+id,qty:q}))});S.cart={};toast('Sale complete: '+money(r.total))});
  if(f.id=='repair')act(()=>api('POST','/api/repairs',d),'Device booked in');
  if(f.id=='product')act(()=>api('POST','/api/products',d),'Product saved');
- if(f.id=='login')act(async()=>{sessionStorage.t=(await api('POST','/api/login',d)).token});
+ if(f.id=='login'){LSset('remember',d.remember?'1':'0');act(async()=>{const r=await api('POST','/api/login',{password:d.password,remember:!!d.remember});setT(r.token,!!d.remember)})}
+ if(f.id=='forgot'){if(d.password!==d.password2)return toast('The two passwords do not match',1);
+  (async()=>{try{const r=await api('POST','/api/forgot',{key:d.key,password:d.password});loginView('done',r.recovery_key)}catch(e){toast(e.message,1)}})()}
  if(f.id=='range'){S.rng=d;S.q='?from='+d.from+'&to='+d.to;act(async()=>{},'Report updated')}
  if(f.id=='customer'){d.id_checked=!!d.id_checked;act(()=>api('POST','/api/customers',d),'Customer saved')}
  if(f.classList.contains('restock'))act(()=>api('PUT','/api/products/'+f.dataset.id,{add:+d.add,cost:d.cost,price:d.price}),'Stock updated')});
-sessionStorage.t?load():loginView();
+(async()=>{if(!getT())return loginView();try{await load()}catch(e){loginView();if(getT())toast(e.message,1)}})();
 </script></body></html>
