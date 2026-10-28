@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS products(
   id INTEGER PRIMARY KEY, sku TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
   category TEXT NOT NULL, price REAL NOT NULL CHECK(price>=0),
   stock INTEGER NOT NULL DEFAULT 0 CHECK(stock>=0), low_stock INTEGER NOT NULL DEFAULT 5,
-  cost REAL NOT NULL DEFAULT 0, image TEXT DEFAULT '', is_new INTEGER NOT NULL DEFAULT 0);
+  cost REAL NOT NULL DEFAULT 0, image TEXT DEFAULT '', is_new INTEGER NOT NULL DEFAULT 0, color TEXT DEFAULT '');
 CREATE TABLE IF NOT EXISTS customers(
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, phone TEXT, dob TEXT NOT NULL,
   id_checked INTEGER NOT NULL DEFAULT 0, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
@@ -36,11 +36,7 @@ CREATE TABLE IF NOT EXISTS repairs(
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, expires_at TEXT NOT NULL);
 """
-SEED = [("DS-001", "Disposable 9000 puffs - Mixed Berry", "disposable", 450, 300, 20, 1), ("DS-002", "Disposable 12000 puffs - Watermelon Ice", "disposable", 550, 380, 15, 1),
-        ("PD-101", "Pod kit 800mAh", "pod", 1200, 800, 8, 1), ("PD-102", "Pod cartridge 2ml (2 pack)", "pod", 250, 150, 25, 0),
-        ("EL-001", "Nic salt 30ml - Mango Ice", "e-liquid", 350, 220, 24, 0), ("EL-002", "Freebase 60ml - Tobacco", "e-liquid", 500, 320, 3, 0),
-        ("EG-001", "Egyptian salt 30ml - Apple Double", "egyptian e-liquid", 200, 120, 18, 1), ("CL-201", "Mesh coil 0.6 ohm (5 pack)", "coil", 300, 180, 30, 0),
-        ("AC-301", "18650 battery 3000mAh", "accessory", 250, 150, 12, 0)]
+DEMO_SKUS = ["DS-001", "DS-002", "PD-101", "PD-102", "EL-001", "EL-002", "EG-001", "CL-201", "AC-301"]  # the old sample products
 
 # ---------- authentication ----------
 def hash_pw(pw, salt=None):
@@ -104,10 +100,8 @@ def init():
     with db() as c:
         c.executescript(SCHEMA)
         for t, col, ddl in [("products", "cost", "REAL NOT NULL DEFAULT 0"), ("products", "image", "TEXT DEFAULT ''"),
-                            ("products", "is_new", "INTEGER NOT NULL DEFAULT 0"), ("sale_items", "unit_cost", "REAL NOT NULL DEFAULT 0")]:
+                            ("products", "is_new", "INTEGER NOT NULL DEFAULT 0"), ("products", "color", "TEXT DEFAULT ''"), ("sale_items", "unit_cost", "REAL NOT NULL DEFAULT 0")]:
             if col not in [r[1] for r in c.execute(f"PRAGMA table_info({t})")]: c.execute(f"ALTER TABLE {t} ADD COLUMN {col} {ddl}")
-        if not c.execute("SELECT 1 FROM products").fetchone():
-            c.executemany("INSERT INTO products(sku,name,category,price,cost,stock,is_new) VALUES(?,?,?,?,?,?,?)", SEED)
         ensure_password(c)
 
 class Err(Exception):
@@ -147,25 +141,43 @@ def list_products(c, b):
         if im.startswith("data:"): p["image"] = f"/img/{p['id']}?v={hashlib.md5(im.encode()).hexdigest()[:8]}"
     return out
 
+def clean_color(v):
+    v = str(v or "").strip()
+    if not re.fullmatch(r"[\w #\-]{0,30}", v): raise Err("Color can only be a name like Blue or a code like #1e90ff")
+    return v
+
 def add_product(c, b):
-    need(b, "sku", "name", "category", "price")
-    try: cur = c.execute("INSERT INTO products(sku,name,category,price,cost,stock,low_stock,image,is_new) VALUES(?,?,?,?,?,?,?,?,?)",
-        (b["sku"], b["name"], b["category"], float(b["price"]), float(b.get("cost") or 0), int(b.get("stock") or 0),
-         int(b.get("low_stock") or 5), clean_image(b.get("image")), 1 if b.get("is_new") else 0))
-    except sqlite3.IntegrityError as e: raise Err(f"Could not save product: {e}")
+    need(b, "name", "category", "price")
+    sku = str(b.get("sku") or "").strip() or "P-" + secrets.token_hex(3).upper()  # made automatically if left empty
+    try: cur = c.execute("INSERT INTO products(sku,name,category,price,cost,stock,low_stock,image,is_new,color) VALUES(?,?,?,?,?,?,?,?,?,?)",
+        (sku, b["name"], b["category"], float(b["price"]), float(b.get("cost") or 0), int(b.get("stock") or 0),
+         int(b.get("low_stock") or 5), clean_image(b.get("image")), 1 if b.get("is_new") else 0, clean_color(b.get("color"))))
+    except sqlite3.IntegrityError as e: raise Err("That SKU is already used by another product" if "sku" in str(e) else f"Could not save product: {e}")
     return {"id": cur.lastrowid}
 
 def update_product(c, b, pid):
     """Change cost/price/name/image/new-flag and receive stock (add can be negative for corrections)."""
     n = int(b.get("add") or 0)
     sets, vals = ["stock=stock+?"], [n]
-    for k, cast in (("name", str), ("price", float), ("cost", float), ("is_new", int)):
+    for k, cast in (("name", str), ("category", str), ("price", float), ("cost", float), ("is_new", int)):
         if b.get(k) not in (None, ""): sets.append(f"{k}=?"); vals.append(cast(b[k]))
     if "image" in b: sets.append("image=?"); vals.append(clean_image(b["image"]))  # "" removes the photo
+    if "color" in b: sets.append("color=?"); vals.append(clean_color(b["color"]))
     try: ok = c.execute(f"UPDATE products SET {','.join(sets)} WHERE id=?", vals + [pid]).rowcount
     except sqlite3.IntegrityError: raise Err("Stock would go below zero")
     if not ok: raise Err("Product not found", 404)
     return {"ok": True}
+
+def delete_product(c, b, pid):
+    if c.execute("SELECT 1 FROM sale_items WHERE product_id=?", (pid,)).fetchone():
+        raise Err("This product has been sold before, so it cannot be deleted (reports need its history). Set its stock to 0 instead.", 409)
+    if not c.execute("DELETE FROM products WHERE id=?", (pid,)).rowcount: raise Err("Product not found", 404)
+    return {"ok": True}
+
+def clear_demo(c, b):
+    q = ",".join("?" * len(DEMO_SKUS))
+    n = c.execute(f"DELETE FROM products WHERE sku IN ({q}) AND id NOT IN (SELECT product_id FROM sale_items)", DEMO_SKUS).rowcount
+    return {"deleted": n}
 
 def report(c, b):
     d1, d2 = b.get("from") or "0000-01-01", b.get("to") or "9999-12-31"
@@ -266,6 +278,8 @@ ROUTES = [
  ("GET", r"/api/products", list_products),
  ("POST", r"/api/products", add_product),
  ("PUT", r"/api/products/(\d+)", lambda c, b, i: update_product(c, b, int(i))),
+ ("DELETE", r"/api/products/(\d+)", lambda c, b, i: delete_product(c, b, int(i))),
+ ("POST", r"/api/products/clear-demo", clear_demo),
  ("GET", r"/api/report", report),
  ("GET", r"/api/dashboard", dashboard),
  ("POST", r"/api/login", login),
@@ -292,7 +306,7 @@ class H(BaseHTTPRequestHandler):
         if re.fullmatch(r"null|https?://(localhost|127\.0\.0\.1)(:\d+)?", o):  # only pages on this computer
             self.send_header("Access-Control-Allow-Origin", o); self.send_header("Vary", "Origin")
             self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Token")
-            self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
         self.send_header("Content-Length", str(len(data))); self.end_headers(); self.wfile.write(data)
 
     def handle_api(self, method):
@@ -330,6 +344,7 @@ class H(BaseHTTPRequestHandler):
     def do_OPTIONS(self): self.send(204, b"", "text/plain")
     def do_POST(self): self.handle_api("POST")
     def do_PUT(self): self.handle_api("PUT")
+    def do_DELETE(self): self.handle_api("DELETE")
     def log_message(self, *a): pass
 
 def cli_reset():
