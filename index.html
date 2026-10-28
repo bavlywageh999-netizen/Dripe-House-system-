@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Drip House</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0b1220;--pan:#121a2b;--pan2:#18233a;--ink:#e8edf7;--mute:#8a97b1;--line:#243049;--acc:#3b82f6;--c1:#3b82f6;--c2:#ef4444;--c3:#f59e0b;--c4:#22c55e;--c5:#22d3ee;--r:10px}
 [data-theme=light]{--bg:#f1f4f9;--pan:#fff;--pan2:#f3f5fa;--ink:#0f172a;--mute:#5b6678;--line:#dfe4ee}
@@ -88,6 +88,20 @@ body.login::before,body.login::after{content:"";position:fixed;left:0;right:0;he
 body.login::before{top:0;background-position:50% 0;-webkit-mask-image:linear-gradient(#000 60%,transparent);mask-image:linear-gradient(#000 60%,transparent)}
 body.login::after{bottom:0;background-position:50% 100%;-webkit-mask-image:linear-gradient(transparent,#000 40%);mask-image:linear-gradient(transparent,#000 40%)}
 body.login .app{position:relative;z-index:1}}
+
+.bd.new{left:auto;right:10px;width:44px;height:44px;padding:0;display:grid;place-items:center;border-radius:50%;background:#2563eb;font-size:13px}.bd.out,.bd.low{right:auto;left:10px}
+.sec{font-size:20px;margin:0 0 12px}.empty{margin:20px auto 0}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;margin-bottom:26px}
+.tile{position:relative;aspect-ratio:4/3;border-radius:var(--r);overflow:hidden;container-type:inline-size;background:radial-gradient(120% 95% at 50% 18%,#2f6bff 0%,#1b3fc4 42%,#0a1a60 100%);border:1px solid rgba(47,123,255,.45)}
+.tile.on{box-shadow:0 0 0 3px var(--acc)}
+.tl-main{position:absolute;inset:0;width:100%;height:100%;padding:0;border:0;background:none;color:#fff;cursor:pointer;display:block}.tl-main:focus-visible{outline:3px solid #fff;outline-offset:-4px}
+.tl-main img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.tart{position:absolute;left:0;top:4%;width:100%;height:auto}.tart .k{fill:var(--col)}.tart .d{fill:color-mix(in srgb,var(--col) 66%,#000)}.tart .l{fill:color-mix(in srgb,var(--col) 50%,#fff)}
+.tl-title{position:absolute;left:6px;right:6px;bottom:40px;display:flex;flex-direction:column;align-items:center;font:400 30px/.95 'Bebas Neue',Impact,'Haettenschweiler','Arial Narrow',sans-serif;letter-spacing:.01em;text-transform:uppercase;-webkit-text-stroke:.8px #fff;text-shadow:0 2px 14px rgba(0,0,50,.8)}.tl-title span{display:block;white-space:nowrap}
+.tl-btn{white-space:nowrap;position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:#1c63e6;color:#fff;font:700 12px Inter,sans-serif;letter-spacing:.05em;padding:5px 16px;border-radius:14px;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+.tl-edit{position:absolute;top:8px;right:8px;padding:4px 10px;font:600 12px Inter,sans-serif;color:#fff;background:rgba(0,0,40,.6);border:1px solid rgba(255,255,255,.3);border-radius:14px;cursor:pointer;opacity:0;transition:opacity .15s}
+.tile:hover .tl-edit,.tl-edit:focus-visible{opacity:1}@media(hover:none){.tl-edit{opacity:1}}
+@media(max-width:600px){.tiles{grid-template-columns:repeat(2,1fr);gap:10px}.tl-btn{font-size:10px;padding:3px 12px;bottom:8px}.tl-title{bottom:30px}.sec{font-size:18px}}
 </style></head><body>
 <div class="app"><aside><div class="brand"><span class="logo" id="lg"></span>Drip House</div><nav id="nav"></nav></aside>
 <div class="main"><header><input id="q" type="search" placeholder="Search products…" aria-label="Search products"><span class="sp"></span>
@@ -136,10 +150,11 @@ function loginView(mode='login',key=''){document.body.classList.add('login');
 const LS=k=>{try{return localStorage['pref_'+k]}catch(e){}},LSset=(k,v)=>{try{localStorage['pref_'+k]=v}catch(e){}};
 function toast(t,err){const e=$('#toast');e.textContent=t;e.className=err?'err':'';e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',3500)}
 async function act(fn,ok){try{await fn();if(ok)toast(ok);await load()}catch(e){toast(e.message,1)}}
-async function load(){[S.products,S.customers,S.repairs,S.sales,S.sum,S.report,S.dash]=await Promise.all(['products','customers','repairs','sales','summary','report','dashboard'].map(k=>api('GET','/api/'+k+(k=='report'?S.q:''))));render()}
+async function load(){[S.products,S.customers,S.repairs,S.sales,S.sum,S.report,S.dash,S.catimg]=await Promise.all(['products','customers','repairs','sales','summary','report','dashboard','catimages'].map(k=>api('GET','/api/'+k+(k=='report'?S.q:''))));render()}
 const ago=s=>{const m=(Date.now()-new Date(s.replace(' ','T')+'Z'))/6e4;return m<1?'just now':m<60?Math.floor(m)+' min ago':m<1440?Math.floor(m/60)+' h ago':Math.floor(m/1440)+' d ago'};
 const when=s=>new Date(s.replace(' ','T')+'Z').toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'});
-const fp=(cat=S.cat)=>S.products.filter(p=>(!cat||(cat=='__new'?p.is_new:p.category==cat))&&(!S.find||(p.name+' '+p.sku).toLowerCase().includes(S.find)));
+const isNew=p=>{const t=Date.parse(String(p.created_at||'').replace(' ','T')+'Z');return !!t&&Date.now()-t<14*864e5};
+const fp=(cat=S.cat)=>S.products.filter(p=>(!cat||(cat=='__new'?isNew(p):p.category==cat))&&(!S.find||(p.name+' '+p.sku).toLowerCase().includes(S.find)));
 const lvl=p=>{const w=Math.min(100,p.stock/Math.max(p.low_stock*4,20)*100),c=p.stock<=p.low_stock?'c2':p.stock<=p.low_stock*2?'c3':'c4';return `<span class="lvl"><i style="width:${w}%;background:var(--${c})"></i></span><span class="num ${p.stock<=p.low_stock?'low':''}">${p.stock}</span>`};
 function lineChart(labels,series){const W=640,H=230,L=48,R=12,T=10,B=26,n=labels.length,mx=Math.max(1000,...series.flatMap(s=>s.v)),p=10**Math.floor(Math.log10(mx)),nm=[1,2,4,8,10].map(k=>k*p).find(v=>v>=mx),x=i=>L+i*(W-L-R)/(n-1),y=v=>T+(H-T-B)*(1-v/nm),f=v=>v>=1000?(v/1000)+'K':v;let g='';
  for(let k=0;k<=4;k++){const v=nm*k/4;g+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" class="gl"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end">${f(Math.round(v))}</text>`}
@@ -150,7 +165,7 @@ function barChart(cs){if(!cs.length)return '<p style="color:var(--mute)">No prod
  cs.forEach((c,i)=>{const h=(H-T-B)*c.units/nm,cx=L+step*i+step/2;g+=`<rect x="${cx-bw/2}" y="${H-B-h}" width="${bw}" height="${h}" rx="3" style="fill:var(--${cl[i%5]})"/><text x="${cx}" y="${H-B-h-4}" text-anchor="middle">${c.units}</text><text x="${cx}" y="${H-B+16}" text-anchor="middle">${esc(LABEL[c.category]||c.category)}</text>`});
  return `<svg viewBox="0 0 ${W} ${H}" class="ch" role="img" aria-label="Units sold per category">${g}</svg>`}
 const CC={disposable:'c5',pod:'c1','e-liquid':'c4','egyptian e-liquid':'c3',coil:'c2',accessory:'c1'};
-const imgSrc=p=>!p.image?'':p.image.startsWith('/img/')?(BASE||'')+p.image:p.image;
+const src2=u=>!u?'':u.startsWith('/')?(BASE||'')+u:u,imgSrc=p=>src2(p.image);
 async function shrink(file,max=640){const url=URL.createObjectURL(file);
  try{const img=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=()=>no(Error('That file is not an image the browser can read. Try a JPG or PNG.'));i.src=url});
   const k=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);
@@ -172,7 +187,7 @@ const ART={device:'<rect class="d" x="52" y="4" width="16" height="12" rx="5"/><
 const art=p=>{const c=String(p.category||''),k=/liquid/.test(c)?'bottle':/coil|accessor/.test(c)?'cell':'device';return `<svg class="art" viewBox="0 0 120 160" aria-hidden="true"><ellipse cx="60" cy="153" rx="30" ry="4" fill="#000" opacity=".28"/>${ART[k]}</svg>`};
 const photoField=(cur)=>`<label>Photo<input name="photo" type="file" accept="image/*"></label><img class="pv" alt="Photo preview" ${cur?`src="${esc(cur)}"`:'hidden'}>`;
 const CATS=['disposable','pod','e-liquid','egyptian e-liquid','coil','accessory'];
-function productView(p){const q=p||{name:'',color:'',category:'pod'},cats=[...new Set([...CATS,q.category])],has=!!(p&&p.image);
+function productView(p){const q=p||{name:'',color:'',category:CATS.includes(S.shopCat)?S.shopCat:'pod'},cats=[...new Set([...CATS,q.category])],has=!!(p&&p.image);
  $('#modal').innerHTML=`<div class="ov"><form id="pform" class="pan md" ${p?`data-id="${p.id}"`:''}><h3>${p?'Edit product':'Add product'}</h3>
  <div class="pi pvart" id="artpv" style="--col:${artHex(q)}" ${has?'hidden':''}>${art(q)}</div>
  <label>Name<input name="name" value="${esc(q.name)}" placeholder="e.g. Nexlim 2" required></label>
@@ -182,10 +197,22 @@ function productView(p){const q=p||{name:'',color:'',category:'pod'},cats=[...ne
  <p style="margin:-2px 0 0;color:var(--mute);font-size:12px">The color is used to draw the item when there is no photo. If you leave it empty, a color word in the name (like “Blue Nexlim 2”) is used.</p>
  <div class="row"><label style="flex:1">Selling price<input name="price" type="number" step="0.01" min="0" value="${p?p.price:''}" required></label><label style="flex:1">Cost (what we pay)<input name="cost" type="number" step="0.01" min="0" value="${p?p.cost:''}" required></label></div>
  ${p?'':'<div class="row"><label style="flex:1">Quantity we have<input name="stock" type="number" min="0" value="0"></label><label style="flex:1">SKU (optional)<input name="sku" placeholder="Made for you"></label></div>'}
- ${photoField(p?imgSrc(p):'')}<label>Or photo link<input name="image" type="url" placeholder="https://"></label>${has?'<label class="row"><input name="rmphoto" type="checkbox"> Remove current photo</label>':''}
- <label class="row"><input name="is_new" type="checkbox" ${p&&p.is_new?'checked':''}> Show the “New” badge</label>
+ ${photoField(p?imgSrc(p):'')}${has?'<label class="row"><input name="rmphoto" type="checkbox"> Remove current photo</label>':''}
  <div class="row" style="justify-content:flex-end">${p?`<button type="button" class="b ghost" data-del="${p.id}" style="margin-right:auto;color:var(--c2)">Delete</button>`:''}<button type="button" class="b ghost" data-close>Cancel</button><button class="b">${p?'Save changes':'Add product'}</button></div></form></div>`;
  $('#modal input[name=name]').focus()}
+const TITLE={disposable:'Disposables',pod:'Pod System','e-liquid':'Premium E-liquid','egyptian e-liquid':'Egyptian E-liquid',coil:'Coils',accessory:'Accessories'};
+const TLINES={disposable:['Disposables'],pod:['Pod System'],'e-liquid':['Premium','E-liquid'],'egyptian e-liquid':['Egyptian','E-liquid'],coil:['Coils'],accessory:['Accessories']};
+const TILE={disposable:['device',['#2563eb','#eef0f4','#1e3a8a','#0d9488','#ec4899']],pod:['device',['#262b35','#d4a017','#7f1d1d','#6b7280','#2563eb']],'e-liquid':['bottle',['#92400e','#a3a9b5','#ec4899','#eef0f4','#262b35']],'egyptian e-liquid':['bottle',['#d8c3a5','#eef0f4','#262b35','#f97316','#2563eb']],coil:['cell',['#a3a9b5','#d4a017','#92400e']],accessory:['cell',['#2563eb','#262b35','#dc2626']]};
+function tileArt(c){const [k,cols]=TILE[c]||['device',['#2563eb','#eef0f4','#262b35']],n=cols.length,mid=(n-1)/2,gap=n>3?72:95;
+ return `<svg class="tart" viewBox="0 0 450 250" aria-hidden="true"><ellipse cx="225" cy="225" rx="190" ry="9" fill="#000" opacity=".28"/>${[...cols.keys()].sort((a,b)=>Math.abs(b-mid)-Math.abs(a-mid)).map(i=>{const d=i-mid,s=1.35-Math.abs(d)*.18;
+  return `<g style="--col:${cols[i]}" transform="translate(${225+d*gap-60*s} ${222-148*s}) rotate(${d*6} ${60*s} ${148*s}) scale(${s})">${ART[k]}</g>`}).join('')}</svg>`}
+const tiles=()=>`<h2 class="sec">Shop by category</h2><div class="tiles">${CATS.map(c=>{const u=src2((S.catimg||{})[c]),t=TITLE[c]||c;
+ return `<article class="tile ${S.shopCat==c?'on':''}"><button class="tl-main" data-tile="${esc(c)}" aria-label="Show ${esc(t)}">${u?`<img src="${esc(u)}" alt="${esc(t)}" loading="lazy">`:`${tileArt(c)}<span class="tl-title">${(TLINES[c]||[t]).map((l,i)=>`<span style="font-size:min(${i?11:14}cqw,${150/l.length}cqw)">${esc(l)}</span>`).join('')}</span><span class="tl-btn">SHOP NOW</span>`}</button><button class="tl-edit" data-tilepic="${esc(c)}" aria-label="Change picture for ${esc(t)}">Edit picture</button></article>`}).join('')}</div>`;
+function tileView(c){const u=src2((S.catimg||{})[c]);
+ $('#modal').innerHTML=`<div class="ov"><form id="tpic" class="pan md" data-cat="${esc(c)}"><h3>Picture for ${esc(TITLE[c]||c)}</h3>
+ <p style="margin:0;color:var(--mute);font-size:13px">Upload a wide banner for this category. It is cropped to fit the tile. Without one, the shop shows a drawn banner.</p>
+ ${photoField(u)}${u?'<label class="row"><input name="rmphoto" type="checkbox"> Use the drawn banner instead</label>':''}
+ <div class="row" style="justify-content:flex-end"><button type="button" class="b ghost" data-close>Cancel</button><button class="b">Save picture</button></div></form></div>`}
 const closeModal=()=>{$('#modal').innerHTML=''};
 function render(){document.body.classList.remove('login');
  $('#nav').innerHTML=Object.entries(TABS).map(([k,[v,i]])=>`<button data-t="${k}" ${S.tab==k?'aria-current="page"':''}>${ico(i)}${v}${k=='inventory'&&S.sum.low_stock.length?`<span class="pill">${S.sum.low_stock.length}</span>`:''}</button>`).join('');
@@ -198,19 +225,19 @@ overview(){const D=S.dash,T=D.totals;
  <section class="pan"><h3>Top selling by category (units)</h3>${barChart(D.categories)}</section></div>
  <div class="two"><section class="pan wrap"><div class="ph"><h3>Product list (stock status)</h3>${catSel()}</div><table><tr><th>Product<th>SKU<th>Category<th>Price<th>Stock level</tr>${fp().map(p=>`<tr><td>${esc(p.name)}<td class="num">${esc(p.sku)}<td>${esc(p.category)}<td class="num">${money(p.price)}<td>${lvl(p)}`).join('')||'<tr><td colspan=5>No products found.'}</table></section>
  <section class="pan"><h3>Recent activity</h3>${D.activity.map(a=>`<div class="fd"><i class="dot ${a.kind}"></i><div>${esc(a.text)}<small>${ago(a.at)}</small></div></div>`).join('')||'<p style="color:var(--mute)">Nothing yet. Sales and repairs will show here.</p>'}</section></div>`},
-shop(){const P=S.products;
- if(!P.length)return `<div class="pan empty"><h3>Your shop is empty</h3><p>Add your first product: type its name, choose a color and add a photo. Without a photo, the shop draws the item in that color for you.</p><button class="b" data-new>Add product</button></div>`;
+shop(){const P=S.products,T=tiles();
+ if(!P.length)return `${T}<div class="pan empty"><h3>Your shop is empty</h3><p>Add your first product: type its name, choose a color and add a photo. Without a photo, the shop draws the item in that color for you.</p><button class="b" data-new>Add product</button></div>`;
  const cats=[...new Set(P.map(p=>p.category))],
- chips=[['','All',P.length],['__new','New',P.filter(p=>p.is_new).length],...cats.map(c=>[c,LABEL[c]||c,P.filter(p=>p.category==c).length])];
- if(S.shopCat&&!chips.some(c=>c[0]==S.shopCat))S.shopCat='';
+ chips=[['','All',P.length],['__new','New',P.filter(isNew).length],...cats.map(c=>[c,LABEL[c]||c,P.filter(p=>p.category==c).length])];
+ if(S.shopCat&&!CATS.includes(S.shopCat)&&!chips.some(c=>c[0]==S.shopCat))S.shopCat='';
  const list=fp(S.shopCat),it=Object.entries(S.cart).filter(([,q])=>q>0),n=it.reduce((a,[,q])=>a+q,0),t=it.reduce((a,[id,q])=>a+q*S.products.find(p=>p.id==id).price,0),
  demo=P.some(p=>DEMO.includes(p.sku));
- return `${demo?'<div class="pan note"><span>The shop still has the sample products that came with the system.</span><button class="b ghost" data-cleardemo>Remove sample products</button></div>':''}
+ return `${T}${demo?'<div class="pan note"><span>The shop still has the sample products that came with the system.</span><button class="b ghost" data-cleardemo>Remove sample products</button></div>':''}
  <div class="bar"><div class="chips">${chips.map(([v,l,c])=>`<button class="chip" data-chip="${esc(v)}" ${S.shopCat==v?'aria-pressed="true"':''}>${esc(l)}<small>${c}</small></button>`).join('')}</div><button class="b" data-new>Add product</button></div>
  ${!P.some(p=>p.image)?'<p style="color:var(--mute);margin:-6px 0 14px">Items without a photo are drawn in their color. Press <b>Edit</b> on an item to add its real photo.</p>':''}
- <div class="shop">${list.map(p=>{const src=imgSrc(p),col=colorOf(p);return `<article class="pc ${p.stock?'':'so'}"><div class="pi" style="--col:${artHex(p)}">${art(p)}${src?`<img src="${esc(src)}" alt="${esc(p.name)}" loading="lazy" onerror="this.remove()">`:''}${p.is_new?'<span class="bd new">New</span>':''}${p.stock<1?'<span class="bd out">Sold out</span>':p.stock<=p.low_stock?`<span class="bd low">Only ${p.stock} left</span>`:''}</div>
+ <div class="shop">${list.map(p=>{const src=imgSrc(p),col=colorOf(p);return `<article class="pc ${p.stock?'':'so'}"><div class="pi" style="--col:${artHex(p)}">${art(p)}${src?`<img src="${esc(src)}" alt="${esc(p.name)}" loading="lazy" onerror="this.remove()">`:''}${isNew(p)?'<span class="bd new">New</span>':''}${p.stock<1?'<span class="bd out">Sold out</span>':p.stock<=p.low_stock?`<span class="bd low">Only ${p.stock} left</span>`:''}</div>
   <div class="pb"><small>${esc(LABEL[p.category]||p.category)}${col?`<i class="sw" style="background:${col.hex}"></i><span style="text-transform:capitalize">${esc(col.name)}</span>`:''}</small><div class="pn">${esc(p.name)}</div><div class="pp num">${money(p.price)}</div>
-  <div class="row"><button class="b" style="flex:1" data-add="${p.id}" ${p.stock?'':'disabled'}>Add to sale</button><button class="b ghost" data-edit="${p.id}" aria-label="Edit ${esc(p.name)}">Edit</button></div></div></article>`}).join('')||'<p style="color:var(--mute)">No products match.</p>'}</div>
+  <div class="row"><button class="b" style="flex:1" data-add="${p.id}" ${p.stock?'':'disabled'}>Add to sale</button><button class="b ghost" data-edit="${p.id}" aria-label="Edit ${esc(p.name)}">Edit</button></div></div></article>`}).join('')||'<p style="color:var(--mute)">No products here yet.</p>'}</div>
  ${n?`<div class="cartbar"><span><b>${n}</b> item${n>1?'s':''}, <b class="num">${money(t)}</b></span><button class="b" data-t="sales">Go to checkout</button></div>`:''}`},
 sales(){const items=Object.entries(S.cart).filter(([,q])=>q>0),total=items.reduce((t,[id,q])=>t+q*S.products.find(p=>p.id==id).price,0);
  return `<div class="two"><section class="pan wrap"><div class="ph"><h3>Products</h3>${catSel()}</div><table><tr><th>Item<th>Price<th>Stock<th></tr>${fp().map(p=>`<tr><td>${esc(p.name)}<td class="num">${money(p.price)}<td class="num ${p.stock<=p.low_stock?'low':''}">${p.stock}<td><button class="b ghost" data-add="${p.id}" ${p.stock?'':'disabled'}>Add</button>`).join('')}</table></section>
@@ -235,6 +262,8 @@ document.addEventListener('click',e=>{if(e.target.classList.contains('ov'))retur
  if(t.dataset.chip!==undefined){S.shopCat=t.dataset.chip;render()}
  if(t.dataset.edit)productView(S.products.find(p=>p.id==t.dataset.edit));
  if(t.dataset.new!==undefined)productView();
+ if(t.dataset.tile!==undefined){S.shopCat=S.shopCat==t.dataset.tile?'':t.dataset.tile;render();const b=document.querySelector('.bar,.empty');if(b)b.scrollIntoView({behavior:'smooth',block:'start'})}
+ if(t.dataset.tilepic)tileView(t.dataset.tilepic);
  if(t.dataset.del&&confirm('Delete this product? This cannot be undone.'))act(async()=>{await api('DELETE','/api/products/'+t.dataset.del);closeModal()},'Product deleted');
  if(t.dataset.cleardemo!==undefined&&confirm('Remove the sample products? Products that were already sold stay.'))act(async()=>{const r=await api('POST','/api/products/clear-demo');toast(r.deleted+' sample product'+(r.deleted==1?'':'s')+' removed')});
  if(t.dataset.close!==undefined)closeModal();
@@ -248,14 +277,16 @@ document.addEventListener('keydown',e=>{if(e.key=='Escape')closeModal()});
 document.addEventListener('input',e=>{const f=e.target.closest&&e.target.closest('#pform'),a=$('#artpv');if(!f||!a)return;const d=Object.fromEntries(new FormData(f)),q={name:d.name||'',color:d.color||'',category:d.category};a.style.setProperty('--col',artHex(q));a.innerHTML=art(q)});
 document.addEventListener('change',e=>{const t=e.target;
  if(t.type=='file'){const pv=t.closest('form').querySelector('.pv'),f=t.files[0],a=$('#artpv');if(pv&&f){pv.src=URL.createObjectURL(f);pv.hidden=false}if(a)a.hidden=!!f}
- if(t.name=='rmphoto'){const a=$('#artpv'),v=t.closest('form').querySelector('.pv');a.hidden=!t.checked;v.hidden=t.checked}if(t.dataset.rs)act(()=>api('PUT','/api/repairs/'+t.dataset.rs,{status:t.value}),'Status updated');if(t.id=='catf'){S.cat=t.value;render()}});
+ if(t.name=='rmphoto'){const a=$('#artpv'),v=t.closest('form').querySelector('.pv');if(a)a.hidden=!t.checked;v.hidden=t.checked}if(t.dataset.rs)act(()=>api('PUT','/api/repairs/'+t.dataset.rs,{status:t.value}),'Status updated');if(t.id=='catf'){S.cat=t.value;render()}});
 $('#q').addEventListener('input',e=>{S.find=e.target.value.trim().toLowerCase();if(getT()&&['overview','shop','sales','inventory'].includes(S.tab))render()});
 document.addEventListener('submit',e=>{e.preventDefault();const f=e.target,d=Object.fromEntries(new FormData(f));
  if(f.id=='sale')act(async()=>{const r=await api('POST','/api/sales',{customer_id:+d.customer_id,items:Object.entries(S.cart).filter(([,q])=>q>0).map(([id,q])=>({product_id:+id,qty:q}))});S.cart={};toast('Sale complete: '+money(r.total))});
  if(f.id=='repair')act(()=>api('POST','/api/repairs',d),'Device booked in');
- if(f.id=='pform')act(async()=>{const id=f.dataset.id,p={name:d.name,color:d.color.trim(),category:d.category,price:d.price,cost:d.cost,is_new:d.is_new?1:0};
-  if(d.photo&&d.photo.size)p.image=await shrink(d.photo);else if(d.rmphoto)p.image='';else if(d.image&&d.image.trim())p.image=d.image.trim();
+ if(f.id=='pform')act(async()=>{const id=f.dataset.id,p={name:d.name,color:d.color.trim(),category:d.category,price:d.price,cost:d.cost};
+  if(d.photo&&d.photo.size)p.image=await shrink(d.photo);else if(d.rmphoto)p.image='';
   if(id)await api('PUT','/api/products/'+id,p);else{p.sku=d.sku;p.stock=d.stock;await api('POST','/api/products',p)}closeModal()},f.dataset.id?'Product updated':'Product added');
+ if(f.id=='tpic')act(async()=>{let img=null;if(d.photo&&d.photo.size)img=await shrink(d.photo,900);else if(d.rmphoto)img='';
+  if(img!==null)await api('PUT','/api/catimage',{category:f.dataset.cat,image:img});closeModal()},'Picture saved');
  if(f.id=='login'){LSset('remember',d.remember?'1':'0');act(async()=>{const r=await api('POST','/api/login',{password:d.password,remember:!!d.remember});setT(r.token,!!d.remember)})}
  if(f.id=='forgot'){if(d.password!==d.password2)return toast('The two passwords do not match',1);
   (async()=>{try{const r=await api('POST','/api/forgot',{key:d.key,password:d.password});loginView('done',r.recovery_key)}catch(e){toast(e.message,1)}})()}

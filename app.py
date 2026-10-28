@@ -1,6 +1,6 @@
 """Vape shop + repair workshop system. Python 3 stdlib only: python app.py -> http://localhost:8000"""
 import base64, hashlib, json, os, re, secrets, sqlite3, sys, threading, time, traceback, webbrowser, datetime as dt
-from urllib.parse import urlsplit, parse_qs
+from urllib.parse import urlsplit, parse_qs, quote, unquote
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 DB = os.environ.get("DB_PATH", "workshop.db")
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS products(
   id INTEGER PRIMARY KEY, sku TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
   category TEXT NOT NULL, price REAL NOT NULL CHECK(price>=0),
   stock INTEGER NOT NULL DEFAULT 0 CHECK(stock>=0), low_stock INTEGER NOT NULL DEFAULT 5,
-  cost REAL NOT NULL DEFAULT 0, image TEXT DEFAULT '', is_new INTEGER NOT NULL DEFAULT 0, color TEXT DEFAULT '');
+  cost REAL NOT NULL DEFAULT 0, image TEXT DEFAULT '', is_new INTEGER NOT NULL DEFAULT 0, color TEXT DEFAULT '', created_at TEXT DEFAULT '');
 CREATE TABLE IF NOT EXISTS customers(
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, phone TEXT, dob TEXT NOT NULL,
   id_checked INTEGER NOT NULL DEFAULT 0, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
@@ -100,7 +100,7 @@ def init():
     with db() as c:
         c.executescript(SCHEMA)
         for t, col, ddl in [("products", "cost", "REAL NOT NULL DEFAULT 0"), ("products", "image", "TEXT DEFAULT ''"),
-                            ("products", "is_new", "INTEGER NOT NULL DEFAULT 0"), ("products", "color", "TEXT DEFAULT ''"), ("sale_items", "unit_cost", "REAL NOT NULL DEFAULT 0")]:
+                            ("products", "is_new", "INTEGER NOT NULL DEFAULT 0"), ("products", "color", "TEXT DEFAULT ''"), ("products", "created_at", "TEXT DEFAULT ''"), ("sale_items", "unit_cost", "REAL NOT NULL DEFAULT 0")]:
             if col not in [r[1] for r in c.execute(f"PRAGMA table_info({t})")]: c.execute(f"ALTER TABLE {t} ADD COLUMN {col} {ddl}")
         ensure_password(c)
 
@@ -149,9 +149,9 @@ def clean_color(v):
 def add_product(c, b):
     need(b, "name", "category", "price")
     sku = str(b.get("sku") or "").strip() or "P-" + secrets.token_hex(3).upper()  # made automatically if left empty
-    try: cur = c.execute("INSERT INTO products(sku,name,category,price,cost,stock,low_stock,image,is_new,color) VALUES(?,?,?,?,?,?,?,?,?,?)",
+    try: cur = c.execute("INSERT INTO products(sku,name,category,price,cost,stock,low_stock,image,is_new,color,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
         (sku, b["name"], b["category"], float(b["price"]), float(b.get("cost") or 0), int(b.get("stock") or 0),
-         int(b.get("low_stock") or 5), clean_image(b.get("image")), 1 if b.get("is_new") else 0, clean_color(b.get("color"))))
+         int(b.get("low_stock") or 5), clean_image(b.get("image")), 1 if b.get("is_new") else 0, clean_color(b.get("color")), now_utc()))
     except sqlite3.IntegrityError as e: raise Err("That SKU is already used by another product" if "sku" in str(e) else f"Could not save product: {e}")
     return {"id": cur.lastrowid}
 
@@ -178,6 +178,21 @@ def clear_demo(c, b):
     q = ",".join("?" * len(DEMO_SKUS))
     n = c.execute(f"DELETE FROM products WHERE sku IN ({q}) AND id NOT IN (SELECT product_id FROM sale_items)", DEMO_SKUS).rowcount
     return {"deleted": n}
+
+def cat_images(c, b):
+    out = {}
+    for k, v in c.execute("SELECT key,value FROM settings WHERE key LIKE 'catimg:%'"):
+        cat = k[7:]; out[cat] = f"/catimg/{quote(cat)}?v={hashlib.md5(v.encode()).hexdigest()[:8]}" if v.startswith("data:") else v
+    return out
+
+def set_cat_image(c, b):
+    need(b, "category")
+    cat = str(b["category"]).strip().lower()
+    if not re.fullmatch(r"[a-z0-9][a-z0-9 \-]{0,29}", cat): raise Err("Unknown category")
+    img = clean_image(b.get("image"))
+    if img: put_set(c, "catimg:" + cat, img)
+    else: c.execute("DELETE FROM settings WHERE key=?", ("catimg:" + cat,))  # empty = back to the drawn banner
+    return {"ok": True}
 
 def report(c, b):
     d1, d2 = b.get("from") or "0000-01-01", b.get("to") or "9999-12-31"
@@ -280,6 +295,8 @@ ROUTES = [
  ("PUT", r"/api/products/(\d+)", lambda c, b, i: update_product(c, b, int(i))),
  ("DELETE", r"/api/products/(\d+)", lambda c, b, i: delete_product(c, b, int(i))),
  ("POST", r"/api/products/clear-demo", clear_demo),
+ ("GET", r"/api/catimages", cat_images),
+ ("PUT", r"/api/catimage", set_cat_image),
  ("GET", r"/api/report", report),
  ("GET", r"/api/dashboard", dashboard),
  ("POST", r"/api/login", login),
@@ -330,10 +347,12 @@ class H(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path.startswith("/api/"): return self.handle_api("GET")
-        im = re.fullmatch(r"/img/(\d+)", self.path.split("?")[0])
-        if im:
-            with db() as c: r = c.execute("SELECT image FROM products WHERE id=?", (int(im.group(1)),)).fetchone()
-            m = re.fullmatch(r"data:(image/[a-z+]+);base64,(.+)", (r[0] if r else "") or "", re.S)
+        path = self.path.split("?")[0]; im = re.fullmatch(r"/img/(\d+)", path); ci = re.fullmatch(r"/catimg/(.+)", path)
+        if im or ci:
+            with db() as c:
+                if im: r = c.execute("SELECT image FROM products WHERE id=?", (int(im.group(1)),)).fetchone(); v = r[0] if r else ""
+                else: v = get_set(c, "catimg:" + unquote(ci.group(1)).lower())
+            m = re.fullmatch(r"data:(image/[a-z+]+);base64,(.+)", v or "", re.S)
             if not m: return self.send(404, b"", "text/plain")
             return self.send(200, base64.b64decode(m.group(2)), m.group(1), "public, max-age=31536000, immutable")
         here = os.path.dirname(os.path.abspath(__file__))

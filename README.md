@@ -21,10 +21,12 @@ Optional settings: MIN_AGE=18  PORT=9000  ADMIN_PASSWORD=yourpass. Data lives in
 - **Edit** on a card changes the name, price, cost, photo and "New" badge. Photos are resized in the browser and stored in the database (nothing extra to install). You can also paste an https photo link when creating a product.
 - The Inventory tab no longer shows cost or price. It is for checking and adding stock. Prices are edited from the Shop page.
 
-## Adding items (Shop page)
-- The shop starts empty. Press **Add product**. Type the name, choose the **Color** and category, set the price and cost, then add a photo if you have one.
-- With no photo, the shop draws the item in its color. The color comes from the Color box, or from a color word in the name ("Blue Nexlime 2"). The picture updates live while you type.
-- Make one product per color ("Nexlime 2 Blue", "Nexlime 2 Red"). Each one gets its own picture and its own stock.
-- **Photo link:** on the supplier's website, right-click the picture, copy the image address, and paste it into "Or photo link". Only use pictures you have permission to use.
+## Shop page
+- **Shop by category:** six banner tiles (Disposables, Pod System, Premium E-liquid, Egyptian E-liquid, Coils, Accessories). Click one to show only that category; click it again to show everything.
+- **Your own banner:** hover a tile (always visible on phones) and press **Edit picture** to upload your own wide banner. **Use the drawn banner instead** goes back to the built-in one. Only use pictures you have permission to use.
+- **Add product:** type the name, choose the **Color** and category, set the price and cost, and add a photo if you have one. SKU is optional and made automatically.
+- **No photo?** The shop draws the item in its color. The color comes from the Color box, or from a color word in the name ("Blue Nexlime 2"). The picture updates live while you type.
+- Make one product per color ("Nexlime 2 Blue", "Nexlime 2 Red"). Each gets its own picture and stock.
+- **New badge:** automatic. An item shows the blue "New" circle for 14 days after you add it.
 - **Edit** on a card also has **Delete**. A product that was already sold cannot be deleted (reports need it). Set its stock to 0 instead.
-- If the system still has the old sample products, a **Remove sample products** button appears on the Shop page.
+- If the system still has the old sample products, a **Remove sample products** button appears.
