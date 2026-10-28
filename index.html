@@ -34,9 +34,9 @@ button.b{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:60
 .leg{display:flex;gap:14px;color:var(--mute);font-size:12px;margin-bottom:4px}.leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px}
 .ch{width:100%;height:auto}.ch text{fill:var(--mute);font-size:11px}.gl{stroke:var(--line)}
 form{display:grid;gap:8px}label{font-size:12px;color:var(--mute);display:grid;gap:3px}.row{display:flex;gap:8px;align-items:center}
-.board{display:grid;grid-template-columns:repeat(5,minmax(190px,1fr));gap:10px;overflow-x:auto}
+.board{display:grid;grid-template-columns:repeat(2,minmax(260px,1fr));gap:10px;overflow-x:auto}
 .col{background:var(--pan2);border-radius:var(--r);padding:8px;min-height:240px}.col h3{font-size:13px;margin:2px 4px 8px;display:flex;justify-content:space-between}
-.tk{background:var(--pan);border:1px solid var(--line);border-left:4px solid var(--c3);border-radius:8px;padding:9px;margin-bottom:8px}.col[data-s=ready] .tk{border-left-color:var(--c4)}
+.tk{background:var(--pan);border:1px solid var(--line);border-left:4px solid var(--c3);border-radius:8px;padding:9px;margin-bottom:8px}.col[data-s=completed] .tk{border-left-color:var(--c4)}
 .tk small{color:var(--mute);display:block}.tk select{width:100%;margin-top:6px}
 #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;display:none}#toast.err{background:var(--c2);color:#fff}
 body.login aside,body.login header{display:none}body.login .app{grid-template-columns:1fr}
@@ -102,6 +102,28 @@ body.login .app{position:relative;z-index:1}}
 .tl-edit{position:absolute;top:8px;right:8px;padding:4px 10px;font:600 12px Inter,sans-serif;color:#fff;background:rgba(0,0,40,.6);border:1px solid rgba(255,255,255,.3);border-radius:14px;cursor:pointer;opacity:0;transition:opacity .15s}
 .tile:hover .tl-edit,.tl-edit:focus-visible{opacity:1}@media(hover:none){.tl-edit{opacity:1}}
 @media(max-width:600px){.tiles{grid-template-columns:repeat(2,1fr);gap:10px}.tl-btn{font-size:10px;padding:3px 12px;bottom:8px}.tl-title{bottom:30px}.sec{font-size:18px}}
+
+.step{display:inline-flex;align-items:center;gap:8px}.step.wide{flex:1;justify-content:space-between}.pb .row .step .b{flex:0 0 34px}.step button{width:34px;height:34px;padding:0;font-size:18px;line-height:1}.step b{min-width:22px;text-align:center}
+.seg{display:inline-flex}.seg button{border-radius:0;padding:0 12px;height:36px}.seg button:first-child{border-radius:8px 0 0 8px}.seg button:last-child{border-radius:0 8px 8px 0;margin-left:-1px}
+.th{width:58px;height:58px;padding:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--pan2);cursor:pointer;flex:none}.th img{width:100%;height:100%;object-fit:cover;display:block}
+.big{width:100%;max-height:58vh;object-fit:contain;border-radius:8px;background:#000}
+/* hover: things lift and catch the light when the mouse touches them */
+.pc,.tile,.kpi,.tk,.chip,button.b,nav button,.th{transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease,background-color .18s ease,filter .18s ease}
+.pc .pi::after,.tile::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.3) 50%,transparent 62%);transform:translateX(-135%)}
+@media(hover:hover){
+ .pc:hover{transform:translateY(-6px);box-shadow:0 16px 34px rgba(0,0,0,.42);border-color:var(--acc)}
+ .pc:hover .pi::after,.tile:hover::after{transform:translateX(135%);transition:transform .8s ease}
+ .tile:hover{transform:translateY(-4px) scale(1.015);box-shadow:0 14px 32px rgba(37,99,235,.4)}
+ .kpi:hover,.tk:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(0,0,0,.3)}
+ button.b:not(:disabled):hover{transform:translateY(-1px);filter:brightness(1.14);box-shadow:0 6px 18px rgba(59,130,246,.38)}
+ button.b:not(:disabled):active{transform:scale(.96)}
+ .chip:hover{transform:translateY(-2px);border-color:var(--acc)}
+ nav button:hover{transform:translateX(4px)}
+ .th:hover{transform:scale(1.07)}
+ tr:hover td{background:color-mix(in srgb,var(--acc) 9%,transparent)}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}.pc:hover,.tile:hover,.kpi:hover,.tk:hover,nav button:hover{transform:none!important}.pc .pi::after,.tile::after{display:none}}
+input[type=file]{font-size:13px;color:var(--mute)}input[type=file]::file-selector-button{background:var(--pan2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 10px;margin-right:8px;cursor:pointer;font:600 12px Inter,sans-serif}
 </style></head><body>
 <div class="app"><aside><div class="brand"><span class="logo" id="lg"></span>Drip House</div><nav id="nav"></nav></aside>
 <div class="main"><header><input id="q" type="search" placeholder="Search products…" aria-label="Search products"><span class="sp"></span>
@@ -117,9 +139,9 @@ const ico=(n,s=18)=>`<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="n
 $('#lg').innerHTML=ico('drop',20);
 const TABS={overview:['Overview','grid'],shop:['Shop','store'],sales:['Sales','cart'],repairs:['Repairs','wrench'],customers:['Customers','users'],inventory:['Inventory','box'],report:['Reports','chart']};
 const DEMO=['DS-001','DS-002','PD-101','PD-102','EL-001','EL-002','EG-001','CL-201','AC-301'];
-const STATUS=['received','diagnosing','repairing','ready','collected'];
+const STATUS=['received','completed'];
 const LABEL={disposable:'Disposables',pod:'Pods','e-liquid':'E-liquid','egyptian e-liquid':'Egyptian',coil:'Coils',accessory:'Accessories'};
-let S={tab:'overview',products:[],customers:[],repairs:[],sales:[],cart:{},sum:{low_stock:[]},report:{items:[],categories:[],totals:{}},dash:{days:[],sales:[],cost:[],profit:[],totals:{},categories:[],activity:[]},q:'',rng:{},cat:'',shopCat:'',find:''};
+let S={tab:'overview',products:[],customers:[],repairs:[],sales:[],cart:{},sum:{low_stock:[]},report:{items:[],categories:[],totals:{}},dash:{days:[],sales:[],cost:[],profit:[],totals:{},categories:[],activity:[]},q:'',rng:{},cat:'',shopCat:'',find:'',cust:'',disc:{v:'',pct:false}};
 function theme(t){document.documentElement.dataset.theme=t;try{localStorage.theme=t}catch(e){}}
 theme((()=>{try{return localStorage.theme}catch(e){}})()||'dark');
 let MEM='';/* token kept in memory too, in case the browser blocks storage */
@@ -165,7 +187,7 @@ function barChart(cs){if(!cs.length)return '<p style="color:var(--mute)">No prod
  cs.forEach((c,i)=>{const h=(H-T-B)*c.units/nm,cx=L+step*i+step/2;g+=`<rect x="${cx-bw/2}" y="${H-B-h}" width="${bw}" height="${h}" rx="3" style="fill:var(--${cl[i%5]})"/><text x="${cx}" y="${H-B-h-4}" text-anchor="middle">${c.units}</text><text x="${cx}" y="${H-B+16}" text-anchor="middle">${esc(LABEL[c.category]||c.category)}</text>`});
  return `<svg viewBox="0 0 ${W} ${H}" class="ch" role="img" aria-label="Units sold per category">${g}</svg>`}
 const CC={disposable:'c5',pod:'c1','e-liquid':'c4','egyptian e-liquid':'c3',coil:'c2',accessory:'c1'};
-const src2=u=>!u?'':u.startsWith('/')?(BASE||'')+u:u,imgSrc=p=>src2(p.image);
+const src2=u=>!u?'':u.startsWith('/')?(BASE||'')+u+(u.startsWith('/rimg/')?'&t='+encodeURIComponent(getT()):''):u,imgSrc=p=>src2(p.image);
 async function shrink(file,max=640){const url=URL.createObjectURL(file);
  try{const img=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=()=>no(Error('That file is not an image the browser can read. Try a JPG or PNG.'));i.src=url});
   const k=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);
@@ -213,6 +235,14 @@ function tileView(c){const u=src2((S.catimg||{})[c]);
  <p style="margin:0;color:var(--mute);font-size:13px">Upload a wide banner for this category. It is cropped to fit the tile. Without one, the shop shows a drawn banner.</p>
  ${photoField(u)}${u?'<label class="row"><input name="rmphoto" type="checkbox"> Use the drawn banner instead</label>':''}
  <div class="row" style="justify-content:flex-end"><button type="button" class="b ghost" data-close>Cancel</button><button class="b">Save picture</button></div></form></div>`}
+const discOf=sub=>{const v=parseFloat(S.disc.v)||0,d=S.disc.pct?sub*Math.min(v,100)/100:v;return Math.round(Math.min(Math.max(d,0),sub)*100)/100};
+const stepper=(p,q,wide)=>`<span class="step ${wide?'wide':''}"><button type="button" class="b ghost" data-sub="${p.id}" ${q?'':'disabled'} aria-label="Remove one ${esc(p.name)}">−</button><b class="num">${q}</b><button type="button" class="b ghost" data-add="${p.id}" aria-label="Add one ${esc(p.name)}">+</button></span>`;
+const cartSub=()=>Object.entries(S.cart).filter(([,q])=>q>0).reduce((t,[id,q])=>t+q*S.products.find(p=>p.id==id).price,0);
+function repairPhotoView(r){const u=src2(r.photo);
+ $('#modal').innerHTML=`<div class="ov"><form id="rphoto" class="pan md" data-id="${r.id}"><h3>Photo: ${esc(r.device)}</h3>
+ ${u?`<img class="big" src="${esc(u)}" alt="Photo of ${esc(r.device)}">`:'<p style="margin:0;color:var(--mute)">No photo yet.</p>'}
+ <label>${u?'Replace photo':'Add photo'}<input name="photo" type="file" accept="image/*"></label>${u?'<label class="row"><input name="rmphoto" type="checkbox"> Remove this photo</label>':''}
+ <div class="row" style="justify-content:flex-end"><button type="button" class="b ghost" data-close>Close</button><button class="b">Save</button></div></form></div>`}
 const closeModal=()=>{$('#modal').innerHTML=''};
 function render(){document.body.classList.remove('login');
  $('#nav').innerHTML=Object.entries(TABS).map(([k,[v,i]])=>`<button data-t="${k}" ${S.tab==k?'aria-current="page"':''}>${ico(i)}${v}${k=='inventory'&&S.sum.low_stock.length?`<span class="pill">${S.sum.low_stock.length}</span>`:''}</button>`).join('');
@@ -237,19 +267,24 @@ shop(){const P=S.products,T=tiles();
  ${!P.some(p=>p.image)?'<p style="color:var(--mute);margin:-6px 0 14px">Items without a photo are drawn in their color. Press <b>Edit</b> on an item to add its real photo.</p>':''}
  <div class="shop">${list.map(p=>{const src=imgSrc(p),col=colorOf(p);return `<article class="pc ${p.stock?'':'so'}"><div class="pi" style="--col:${artHex(p)}">${art(p)}${src?`<img src="${esc(src)}" alt="${esc(p.name)}" loading="lazy" onerror="this.remove()">`:''}${isNew(p)?'<span class="bd new">New</span>':''}${p.stock<1?'<span class="bd out">Sold out</span>':p.stock<=p.low_stock?`<span class="bd low">Only ${p.stock} left</span>`:''}</div>
   <div class="pb"><small>${esc(LABEL[p.category]||p.category)}${col?`<i class="sw" style="background:${col.hex}"></i><span style="text-transform:capitalize">${esc(col.name)}</span>`:''}</small><div class="pn">${esc(p.name)}</div><div class="pp num">${money(p.price)}</div>
-  <div class="row"><button class="b" style="flex:1" data-add="${p.id}" ${p.stock?'':'disabled'}>Add to sale</button><button class="b ghost" data-edit="${p.id}" aria-label="Edit ${esc(p.name)}">Edit</button></div></div></article>`}).join('')||'<p style="color:var(--mute)">No products here yet.</p>'}</div>
+  <div class="row">${(S.cart[p.id]||0)?stepper(p,S.cart[p.id],1):`<button class="b" style="flex:1" data-add="${p.id}" ${p.stock?'':'disabled'}>Add to sale</button>`}<button class="b ghost" data-edit="${p.id}" aria-label="Edit ${esc(p.name)}">Edit</button></div></div></article>`}).join('')||'<p style="color:var(--mute)">No products here yet.</p>'}</div>
  ${n?`<div class="cartbar"><span><b>${n}</b> item${n>1?'s':''}, <b class="num">${money(t)}</b></span><button class="b" data-t="sales">Go to checkout</button></div>`:''}`},
-sales(){const items=Object.entries(S.cart).filter(([,q])=>q>0),total=items.reduce((t,[id,q])=>t+q*S.products.find(p=>p.id==id).price,0);
- return `<div class="two"><section class="pan wrap"><div class="ph"><h3>Products</h3>${catSel()}</div><table><tr><th>Item<th>Price<th>Stock<th></tr>${fp().map(p=>`<tr><td>${esc(p.name)}<td class="num">${money(p.price)}<td class="num ${p.stock<=p.low_stock?'low':''}">${p.stock}<td><button class="b ghost" data-add="${p.id}" ${p.stock?'':'disabled'}>Add</button>`).join('')}</table></section>
- <section class="pan"><h3>Current sale</h3>${items.length?items.map(([id,q])=>`<div class="row" style="justify-content:space-between;margin-bottom:6px"><span>${esc(S.products.find(p=>p.id==id).name)} × ${q}</span><button class="b ghost" data-rm="${id}" aria-label="Remove one">−</button></div>`).join(''):'<p style="color:var(--mute)">Add products from the list to start a sale.</p>'}
- <form id="sale" style="margin-top:12px"><label>Customer (ID must be checked)<select name="customer_id" required><option value="">Choose customer</option>${S.customers.map(c=>`<option value="${c.id}" ${c.id_checked?'':'disabled'}>${esc(c.name)}${c.id_checked?'':' (ID not checked)'}</option>`).join('')}</select></label>
- <div class="row" style="justify-content:space-between"><b>Total</b><b class="num">${money(total)}</b></div><button class="b" ${items.length?'':'disabled'}>Complete sale</button></form></section></div>
- <section class="pan wrap"><h3>Recent sales</h3><table><tr><th>#<th>When<th>Customer<th>Items<th>Total</tr>${S.sales.slice(0,10).map(s=>`<tr><td>${s.id}<td>${when(s.created_at)}<td>${esc(s.customer)}<td>${esc(s.items)}<td class="num">${money(s.total)}`).join('')||'<tr><td colspan=5>No sales yet.'}</table></section>`},
+sales(){const items=Object.entries(S.cart).filter(([,q])=>q>0),sub=cartSub(),dsc=discOf(sub);
+ return `<div class="two"><section class="pan wrap"><div class="ph"><h3>Products</h3>${catSel()}</div><table><tr><th>Item<th>Price<th>Quantity</tr>${fp().map(p=>`<tr><td>${esc(p.name)}<td class="num">${money(p.price)}<td>${p.stock?stepper(p,S.cart[p.id]||0):'<span class="low">Sold out</span>'}`).join('')||'<tr><td colspan=3>No products found.'}</table></section>
+ <section class="pan"><h3>Current sale</h3>${items.length?items.map(([id,q])=>{const p=S.products.find(x=>x.id==id);return `<div class="row" style="justify-content:space-between;margin-bottom:6px"><span>${esc(p.name)}</span>${stepper(p,q)}</div>`}).join(''):'<p style="color:var(--mute)">Add products from the list to start a sale.</p>'}
+ <form id="sale" style="margin-top:12px"><label>Customer (ID must be checked)<select name="customer_id" required><option value="">Choose customer</option>${S.customers.map(c=>`<option value="${c.id}" ${c.id_checked?'':'disabled'} ${S.cust==c.id?'selected':''}>${esc(c.name)}${c.id_checked?'':' (ID not checked)'}</option>`).join('')}</select></label>
+ <label>Discount<span class="row"><input id="disc" name="disc" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" value="${esc(S.disc.v)}" style="flex:1;min-width:0"><span class="seg"><button type="button" class="b ${S.disc.pct?'ghost':''}" data-dmode="amt" aria-pressed="${!S.disc.pct}">L.E.</button><button type="button" class="b ${S.disc.pct?'':'ghost'}" data-dmode="pct" aria-pressed="${S.disc.pct}">%</button></span></span></label>
+ <div class="row" style="justify-content:space-between;color:var(--mute)"><span>Subtotal</span><span class="num" id="subv">${money(sub)}</span></div>
+ <div class="row" style="justify-content:space-between;color:var(--mute)"><span>Discount</span><span class="num" id="dscv">${dsc?'−':''}${money(dsc)}</span></div>
+ <div class="row" style="justify-content:space-between"><b>Total</b><b class="num" id="totv">${money(sub-dsc)}</b></div><button class="b" ${items.length?'':'disabled'}>Complete sale</button></form></section></div>
+ <section class="pan wrap"><h3>Recent sales</h3><table><tr><th>#<th>When<th>Customer<th>Items<th>Discount<th>Total</tr>${S.sales.slice(0,10).map(s=>`<tr><td>${s.id}<td>${when(s.created_at)}<td>${esc(s.customer)}<td>${esc(s.items)}<td class="num">${s.discount>0?money(s.discount):'-'}<td class="num">${money(s.total)}`).join('')||'<tr><td colspan=6>No sales yet.'}</table></section>`},
 repairs(){return `<section class="pan" style="margin-bottom:14px"><h3>Book in a device</h3><form id="repair" class="row" style="flex-wrap:wrap"><select name="customer_id" required><option value="">Customer</option>${S.customers.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
- <input name="device" placeholder="Device (e.g. Box mod 100W)" required><input name="issue" placeholder="What's wrong?" required style="flex:1;min-width:180px"><input name="quote" type="number" step="0.01" min="0" placeholder="Quote L.E." style="width:110px"><button class="b">Book in</button></form></section>
- <div class="board">${STATUS.map(s=>{const t=S.repairs.filter(r=>r.status==s);return `<div class="col" data-s="${s}"><h3>${s[0].toUpperCase()+s.slice(1)}<span class="num">${t.length}</span></h3>${t.map(r=>`<div class="tk"><b>${esc(r.device)}</b><small>${esc(r.issue)}</small><small>${esc(r.customer)} · ${money(r.quote)}</small><select data-rs="${r.id}" aria-label="Status">${STATUS.map(x=>`<option ${x==r.status?'selected':''}>${x}</option>`).join('')}</select></div>`).join('')}</div>`}).join('')}</div>`},
-customers(){return `<div class="two"><section class="pan wrap"><h3>Customers</h3><table><tr><th>Name<th>Phone<th>Date of birth<th>ID</tr>${S.customers.map(c=>`<tr><td>${esc(c.name)}<td>${esc(c.phone)}<td class="num">${esc(c.dob)}<td>${c.id_checked?'Checked':'<b class="low">Not checked</b>'}`).join('')||'<tr><td colspan=4>No customers yet.'}</table></section>
- <section class="pan"><h3>New customer</h3><p style="color:var(--mute);margin:0 0 8px">Customers under ${S.sum.min_age} cannot be registered.</p><form id="customer"><label>Name<input name="name" required></label><label>Phone<input name="phone"></label><label>Date of birth<input name="dob" type="date" required></label><label class="row"><input name="id_checked" type="checkbox"> I checked photo ID</label><button class="b">Save customer</button></form></section></div>`},
+ <input name="device" placeholder="Device (e.g. Box mod 100W)" required style="flex:1;min-width:200px"><input name="issue" placeholder="What's wrong?" required style="flex:1;min-width:180px"><input name="quote" type="number" step="0.01" min="0" placeholder="Quote L.E." style="width:110px">
+ <input name="photo" type="file" accept="image/*" title="Photo of the device (optional)" aria-label="Photo of the device (optional)" style="width:230px"><button class="b">Book in</button></form></section>
+ <div class="board">${[['received','Received'],['completed','Completed']].map(([s,l])=>{const t=S.repairs.filter(r=>r.status==s);return `<div class="col" data-s="${s}"><h3>${l}<span class="num">${t.length}</span></h3>${t.map(r=>{const u=src2(r.photo);return `<div class="tk"><div class="row" style="align-items:flex-start;gap:10px">${u?`<button type="button" class="th" data-rphoto="${r.id}" aria-label="View photo of ${esc(r.device)}"><img src="${esc(u)}" alt="" loading="lazy" onerror="this.remove()"></button>`:''}<div style="flex:1;min-width:0"><b>${esc(r.device)}</b><small>${esc(r.issue)}</small><small>${esc(r.customer)} · ${money(r.quote)}</small>${s=='completed'?`<small>Completed ${when(r.updated_at)}</small>`:''}</div></div>
+  <div class="row" style="margin-top:8px;flex-wrap:wrap">${s=='received'?`<button type="button" class="b" data-done="${r.id}">Mark completed</button>`:`<button type="button" class="b ghost" data-reopen="${r.id}">Move back</button>`}<button type="button" class="b ghost" data-rphoto="${r.id}">${u?'Photo':'Add photo'}</button></div></div>`}).join('')||'<p style="color:var(--mute);margin:6px 4px">Nothing here.</p>'}</div>`}).join('')}</div>`},
+customers(){return `<div class="two"><section class="pan wrap"><h3>Customers</h3><table><tr><th>Name<th>Phone<th>ID</tr>${S.customers.map(c=>`<tr><td>${esc(c.name)}<td>${esc(c.phone)}<td>${c.id_checked?'Checked':'<b class="low">Not checked</b>'}`).join('')||'<tr><td colspan=3>No customers yet.'}</table></section>
+ <section class="pan"><h3>New customer</h3><p style="color:var(--mute);margin:0 0 8px">Look at the customer's photo ID, then tick the box. A sale cannot be completed until it is ticked.</p><form id="customer"><label>Name<input name="name" required></label><label>Phone<input name="phone"></label><label class="row"><input name="id_checked" type="checkbox"> I checked photo ID</label><button class="b">Save customer</button></form></section></div>`},
 inventory(){return `<div class="two"><section class="pan wrap"><div class="ph"><h3>Inventory</h3>${catSel()}</div><table><tr><th>Name<th>Category<th>In stock<th>Add stock</tr>${fp().map(p=>`<tr><td>${esc(p.name)}<td>${esc(p.category)}<td>${lvl(p)}<td><form class="row restock" data-id="${p.id}"><input name="add" type="number" value="0" style="width:80px" aria-label="Add stock for ${esc(p.name)}"><button class="b ghost">Save</button></form>`).join('')}</table></section>
  <section class="pan"><h3>Add an item</h3><p style="color:var(--mute);margin:0 0 12px">Add a new product with its color and photo. Stock for existing items is added in the table.</p><button class="b" data-new>Add product</button></section></div>`},
 report(){const R=S.report,T=R.totals;return `<section class="pan" style="margin-bottom:14px"><form id="range" class="row" style="flex-wrap:wrap"><label>From<input type="date" name="from" value="${S.rng.from||''}"></label><label>To<input type="date" name="to" value="${S.rng.to||''}"></label><button class="b">Show</button></form></section>
@@ -267,7 +302,11 @@ document.addEventListener('click',e=>{if(e.target.classList.contains('ov'))retur
  if(t.dataset.del&&confirm('Delete this product? This cannot be undone.'))act(async()=>{await api('DELETE','/api/products/'+t.dataset.del);closeModal()},'Product deleted');
  if(t.dataset.cleardemo!==undefined&&confirm('Remove the sample products? Products that were already sold stay.'))act(async()=>{const r=await api('POST','/api/products/clear-demo');toast(r.deleted+' sample product'+(r.deleted==1?'':'s')+' removed')});
  if(t.dataset.close!==undefined)closeModal();
- if(t.dataset.rm){S.cart[t.dataset.rm]--;render()}
+ if(t.dataset.sub){S.cart[t.dataset.sub]=Math.max(0,(S.cart[t.dataset.sub]||0)-1);render()}
+ if(t.dataset.dmode){S.disc.pct=t.dataset.dmode=='pct';render()}
+ if(t.dataset.done)act(()=>api('PUT','/api/repairs/'+t.dataset.done,{status:'completed'}),'Repair marked completed');
+ if(t.dataset.reopen)act(()=>api('PUT','/api/repairs/'+t.dataset.reopen,{status:'received'}),'Moved back to received');
+ if(t.dataset.rphoto)repairPhotoView(S.repairs.find(r=>r.id==t.dataset.rphoto));
  if(t.id=='theme')theme(document.documentElement.dataset.theme=='light'?'dark':'light');
  if(t.id=='out'){api('POST','/api/logout').catch(()=>{});clearT();loginView()}
  if(t.dataset.go)loginView(t.dataset.go);
@@ -277,11 +316,14 @@ document.addEventListener('keydown',e=>{if(e.key=='Escape')closeModal()});
 document.addEventListener('input',e=>{const f=e.target.closest&&e.target.closest('#pform'),a=$('#artpv');if(!f||!a)return;const d=Object.fromEntries(new FormData(f)),q={name:d.name||'',color:d.color||'',category:d.category};a.style.setProperty('--col',artHex(q));a.innerHTML=art(q)});
 document.addEventListener('change',e=>{const t=e.target;
  if(t.type=='file'){const pv=t.closest('form').querySelector('.pv'),f=t.files[0],a=$('#artpv');if(pv&&f){pv.src=URL.createObjectURL(f);pv.hidden=false}if(a)a.hidden=!!f}
- if(t.name=='rmphoto'){const a=$('#artpv'),v=t.closest('form').querySelector('.pv');if(a)a.hidden=!t.checked;v.hidden=t.checked}if(t.dataset.rs)act(()=>api('PUT','/api/repairs/'+t.dataset.rs,{status:t.value}),'Status updated');if(t.id=='catf'){S.cat=t.value;render()}});
+ if(t.name=='rmphoto'){const a=$('#artpv'),v=t.closest('form').querySelector('.pv');if(a)a.hidden=!t.checked;if(v)v.hidden=t.checked}
+ if(t.form&&t.form.id=='sale'&&t.name=='customer_id')S.cust=t.value;if(t.id=='catf'){S.cat=t.value;render()}});
+document.addEventListener('input',e=>{if(e.target.id=='disc'){S.disc.v=e.target.value;const sub=cartSub(),d=discOf(sub);$('#subv').textContent=money(sub);$('#dscv').textContent=(d?'−':'')+money(d);$('#totv').textContent=money(sub-d)}});
 $('#q').addEventListener('input',e=>{S.find=e.target.value.trim().toLowerCase();if(getT()&&['overview','shop','sales','inventory'].includes(S.tab))render()});
 document.addEventListener('submit',e=>{e.preventDefault();const f=e.target,d=Object.fromEntries(new FormData(f));
- if(f.id=='sale')act(async()=>{const r=await api('POST','/api/sales',{customer_id:+d.customer_id,items:Object.entries(S.cart).filter(([,q])=>q>0).map(([id,q])=>({product_id:+id,qty:q}))});S.cart={};toast('Sale complete: '+money(r.total))});
- if(f.id=='repair')act(()=>api('POST','/api/repairs',d),'Device booked in');
+ if(f.id=='sale')act(async()=>{const v=parseFloat(S.disc.v)||0,r=await api('POST','/api/sales',{customer_id:+d.customer_id,items:Object.entries(S.cart).filter(([,q])=>q>0).map(([id,q])=>({product_id:+id,qty:q})),discount:S.disc.pct?0:v,discount_percent:S.disc.pct?v:0});S.cart={};S.cust='';S.disc={v:'',pct:false};toast('Sale complete: '+money(r.total)+(r.discount?' (discount '+money(r.discount)+')':''))});
+ if(f.id=='repair')act(async()=>{const p={...d};delete p.photo;if(d.photo&&d.photo.size)p.photo=await shrink(d.photo,800);await api('POST','/api/repairs',p)},'Device booked in');
+ if(f.id=='rphoto')act(async()=>{const p={};if(d.photo&&d.photo.size)p.photo=await shrink(d.photo,800);else if(d.rmphoto)p.photo='';if('photo' in p)await api('PUT','/api/repairs/'+f.dataset.id,p);closeModal()},'Photo saved');
  if(f.id=='pform')act(async()=>{const id=f.dataset.id,p={name:d.name,color:d.color.trim(),category:d.category,price:d.price,cost:d.cost};
   if(d.photo&&d.photo.size)p.image=await shrink(d.photo);else if(d.rmphoto)p.image='';
   if(id)await api('PUT','/api/products/'+id,p);else{p.sku=d.sku;p.stock=d.stock;await api('POST','/api/products',p)}closeModal()},f.dataset.id?'Product updated':'Product added');

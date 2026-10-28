@@ -10,7 +10,7 @@ SESSION_HOURS, REMEMBER_DAYS = 12, 30
 PUBLIC = {"/api/login", "/api/forgot"}  # everything else needs a valid session
 ATTEMPTS = {}  # ip -> (failed count, window start)
 CURRENCY = "L.E."
-STATUSES = ["received", "diagnosing", "repairing", "ready", "collected"]
+STATUSES = ["received", "completed"]
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS products(
@@ -23,16 +23,16 @@ CREATE TABLE IF NOT EXISTS customers(
   id_checked INTEGER NOT NULL DEFAULT 0, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS sales(
   id INTEGER PRIMARY KEY, customer_id INTEGER NOT NULL REFERENCES customers(id),
-  total REAL NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+  total REAL NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP, discount REAL NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS sale_items(
   id INTEGER PRIMARY KEY, sale_id INTEGER NOT NULL REFERENCES sales(id),
   product_id INTEGER NOT NULL REFERENCES products(id), qty INTEGER NOT NULL CHECK(qty>0),
-  unit_price REAL NOT NULL, unit_cost REAL NOT NULL DEFAULT 0);
+  unit_price REAL NOT NULL, unit_cost REAL NOT NULL DEFAULT 0, discount REAL NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS repairs(
   id INTEGER PRIMARY KEY, customer_id INTEGER NOT NULL REFERENCES customers(id),
   device TEXT NOT NULL, issue TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'received',
   quote REAL DEFAULT 0, notes TEXT DEFAULT '', created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT DEFAULT CURRENT_TIMESTAMP);
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP, photo TEXT DEFAULT '');
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, expires_at TEXT NOT NULL);
 """
@@ -100,8 +100,11 @@ def init():
     with db() as c:
         c.executescript(SCHEMA)
         for t, col, ddl in [("products", "cost", "REAL NOT NULL DEFAULT 0"), ("products", "image", "TEXT DEFAULT ''"),
-                            ("products", "is_new", "INTEGER NOT NULL DEFAULT 0"), ("products", "color", "TEXT DEFAULT ''"), ("products", "created_at", "TEXT DEFAULT ''"), ("sale_items", "unit_cost", "REAL NOT NULL DEFAULT 0")]:
+                            ("products", "is_new", "INTEGER NOT NULL DEFAULT 0"), ("products", "color", "TEXT DEFAULT ''"), ("products", "created_at", "TEXT DEFAULT ''"), ("sale_items", "unit_cost", "REAL NOT NULL DEFAULT 0"),
+                            ("sales", "discount", "REAL NOT NULL DEFAULT 0"), ("sale_items", "discount", "REAL NOT NULL DEFAULT 0"), ("repairs", "photo", "TEXT DEFAULT ''")]:
             if col not in [r[1] for r in c.execute(f"PRAGMA table_info({t})")]: c.execute(f"ALTER TABLE {t} ADD COLUMN {col} {ddl}")
+        c.execute("UPDATE repairs SET status='completed' WHERE status IN ('ready','collected')")
+        c.execute("UPDATE repairs SET status='received' WHERE status IN ('diagnosing','repairing')")
         ensure_password(c)
 
 class Err(Exception):
@@ -121,8 +124,8 @@ def summary(c, b=None):
     today = dt.date.today().isoformat()
     return {"min_age": MIN_AGE, "currency": CURRENCY,
         "sales_today": c.execute("SELECT COALESCE(SUM(total),0) FROM sales WHERE date(created_at,'localtime')=?", (today,)).fetchone()[0],
-        "open_repairs": c.execute("SELECT COUNT(*) FROM repairs WHERE status NOT IN ('collected')").fetchone()[0],
-        "ready_repairs": c.execute("SELECT COUNT(*) FROM repairs WHERE status='ready'").fetchone()[0],
+        "open_repairs": c.execute("SELECT COUNT(*) FROM repairs WHERE status='received'").fetchone()[0],
+        "ready_repairs": c.execute("SELECT COUNT(*) FROM repairs WHERE status='completed'").fetchone()[0],
         "low_stock": rows(c, "SELECT id,name,stock,low_stock FROM products WHERE stock<=low_stock ORDER BY stock")}
 
 def clean_image(v):
@@ -197,7 +200,7 @@ def set_cat_image(c, b):
 def report(c, b):
     d1, d2 = b.get("from") or "0000-01-01", b.get("to") or "9999-12-31"
     items = rows(c, """SELECT p.id,p.name,p.category,p.cost,p.price,p.stock,
-        COALESCE(SUM(i.qty),0) sold, COALESCE(SUM(i.qty*i.unit_price),0) revenue, COALESCE(SUM(i.qty*i.unit_cost),0) cogs
+        COALESCE(SUM(i.qty),0) sold, COALESCE(SUM(i.qty*i.unit_price-i.discount),0) revenue, COALESCE(SUM(i.qty*i.unit_cost),0) cogs
         FROM products p LEFT JOIN (SELECT i.* FROM sale_items i JOIN sales s ON s.id=i.sale_id
         WHERE date(s.created_at,'localtime') BETWEEN ? AND ?) i ON i.product_id=p.id GROUP BY p.id ORDER BY revenue DESC, p.name""", (d1, d2))
     cats, t = {}, {"sold": 0, "revenue": 0, "profit": 0, "stock_units": 0, "stock_value": 0}
@@ -211,12 +214,12 @@ def report(c, b):
 def dashboard(c, b):
     today = dt.date.today()
     days = [(today - dt.timedelta(days=i)).isoformat() for i in range(29, -1, -1)]
-    by = {r["d"]: r for r in c.execute("""SELECT date(s.created_at,'localtime') d, SUM(i.qty*i.unit_price) rev, SUM(i.qty*i.unit_cost) cost
+    by = {r["d"]: r for r in c.execute("""SELECT date(s.created_at,'localtime') d, SUM(i.qty*i.unit_price-i.discount) rev, SUM(i.qty*i.unit_cost) cost
         FROM sales s JOIN sale_items i ON i.sale_id=s.id WHERE date(s.created_at,'localtime')>=? GROUP BY d""", (days[0],))}
     sales = [round(by[d]["rev"], 2) if d in by else 0 for d in days]
     cost = [round(by[d]["cost"], 2) if d in by else 0 for d in days]
     rev, orders = c.execute("SELECT COALESCE(SUM(total),0), COUNT(*) FROM sales").fetchone()
-    cats = rows(c, """SELECT p.category, COALESCE(SUM(i.qty),0) units, COALESCE(SUM(i.qty*i.unit_price),0) revenue
+    cats = rows(c, """SELECT p.category, COALESCE(SUM(i.qty),0) units, COALESCE(SUM(i.qty*i.unit_price-i.discount),0) revenue
         FROM products p LEFT JOIN sale_items i ON i.product_id=p.id GROUP BY p.category ORDER BY units DESC""")
     ev = [{"kind": "sale", "at": r["created_at"], "text": f"Sale #{r['id']}: {r['customer']} paid {r['total']:,.0f} {CURRENCY}"} for r in c.execute(
         "SELECT s.id,s.total,s.created_at,cu.name customer FROM sales s JOIN customers cu ON cu.id=s.customer_id ORDER BY s.id DESC LIMIT 8")]
@@ -249,11 +252,11 @@ def forgot(c, b):
     return {"recovery_key": new_recovery(c)}
 
 def add_customer(c, b):
-    need(b, "name", "dob")
-    a = age(b["dob"])
-    if a < MIN_AGE: raise Err(f"Customer is {a}. Minimum age is {MIN_AGE}; record not saved.", 403)
+    need(b, "name")
+    dob = str(b.get("dob") or "").strip()  # no longer asked in the form; still checked if an old client sends it
+    if dob and age(dob) < MIN_AGE: raise Err(f"Customer is {age(dob)}. Minimum age is {MIN_AGE}; record not saved.", 403)
     cur = c.execute("INSERT INTO customers(name,phone,dob,id_checked) VALUES(?,?,?,?)",
-                    (b["name"], b.get("phone", ""), b["dob"], 1 if b.get("id_checked") else 0))
+                    (b["name"], b.get("phone", ""), dob, 1 if b.get("id_checked") else 0))
     return {"id": cur.lastrowid}
 
 def make_sale(c, b):
@@ -261,30 +264,52 @@ def make_sale(c, b):
     cu = c.execute("SELECT * FROM customers WHERE id=?", (b["customer_id"],)).fetchone()
     if not cu: raise Err("Customer not found", 404)
     if not cu["id_checked"]: raise Err("Check the customer's ID and tick 'ID checked' before selling", 403)
-    if age(cu["dob"]) < MIN_AGE: raise Err("Customer is under the minimum age", 403)
+    if cu["dob"] and age(cu["dob"]) < MIN_AGE: raise Err("Customer is under the minimum age", 403)  # customers saved before DOB was removed
     total, lines = 0, []
     for it in b["items"]:
         qty = int(it["qty"]); p = c.execute("SELECT * FROM products WHERE id=?", (it["product_id"],)).fetchone()
         if not p or qty < 1: raise Err("Invalid item")
         if p["stock"] < qty: raise Err(f"Only {p['stock']} left of {p['name']}", 409)
         total += p["price"] * qty; lines.append((p["id"], qty, p["price"], p["cost"]))
-    sid = c.execute("INSERT INTO sales(customer_id,total) VALUES(?,?)", (cu["id"], round(total, 2))).lastrowid
-    for pid, qty, price, cost in lines:
-        c.execute("INSERT INTO sale_items(sale_id,product_id,qty,unit_price,unit_cost) VALUES(?,?,?,?,?)", (sid, pid, qty, price, cost))
+    try: pct, amt = float(b.get("discount_percent") or 0), float(b.get("discount") or 0)
+    except ValueError: raise Err("The discount must be a number")
+    if not 0 <= pct <= 100 or amt < 0: raise Err("The discount must be between 0 and 100%, or an amount of 0 or more")
+    disc = round(total * pct / 100, 2) if pct else round(amt, 2)
+    if disc > round(total, 2): raise Err("The discount cannot be more than the total")
+    shares, left = [], disc  # each line carries its share of the discount, so reports show the real (net) revenue
+    for i, (pid, qty, price, cost) in enumerate(lines):
+        sh = left if i == len(lines) - 1 else round(disc * price * qty / total, 2) if total else 0
+        shares.append(sh); left = round(left - sh, 2)
+    net = round(total - disc, 2)
+    sid = c.execute("INSERT INTO sales(customer_id,total,discount) VALUES(?,?,?)", (cu["id"], net, disc)).lastrowid
+    for (pid, qty, price, cost), sh in zip(lines, shares):
+        c.execute("INSERT INTO sale_items(sale_id,product_id,qty,unit_price,unit_cost,discount) VALUES(?,?,?,?,?,?)", (sid, pid, qty, price, cost, sh))
         c.execute("UPDATE products SET stock=stock-? WHERE id=?", (qty, pid))
-    return {"id": sid, "total": round(total, 2)}
+    return {"id": sid, "total": net, "discount": disc}
 
 def add_repair(c, b):
     need(b, "customer_id", "device", "issue")
     if not c.execute("SELECT 1 FROM customers WHERE id=?", (b["customer_id"],)).fetchone(): raise Err("Customer not found", 404)
-    cur = c.execute("INSERT INTO repairs(customer_id,device,issue,quote) VALUES(?,?,?,?)",
-                    (b["customer_id"], b["device"], b["issue"], float(b.get("quote") or 0)))
+    cur = c.execute("INSERT INTO repairs(customer_id,device,issue,quote,photo) VALUES(?,?,?,?,?)",
+                    (b["customer_id"], b["device"], b["issue"], float(b.get("quote") or 0), clean_image(b.get("photo"))))
     return {"id": cur.lastrowid}
+
+def list_repairs(c, b):
+    out = rows(c, """SELECT r.*,cu.name customer,cu.phone FROM repairs r
+        JOIN customers cu ON cu.id=r.customer_id ORDER BY r.status='completed', r.id DESC""")
+    for r in out:  # photos are served from /rimg/<id> (needs sign-in), not packed into the list
+        im = r["photo"] or ""
+        if im.startswith("data:"): r["photo"] = f"/rimg/{r['id']}?v={hashlib.md5(im.encode()).hexdigest()[:8]}"
+    return out
 
 def update_repair(c, b, rid):
     if "status" in b and b["status"] not in STATUSES: raise Err("Unknown status")
-    c.execute("""UPDATE repairs SET status=COALESCE(?,status), quote=COALESCE(?,quote), notes=COALESCE(?,notes),
-                 updated_at=CURRENT_TIMESTAMP WHERE id=?""", (b.get("status"), b.get("quote"), b.get("notes"), rid))
+    sets, vals = ["updated_at=CURRENT_TIMESTAMP"], []
+    if b.get("status") is not None: sets.append("status=?"); vals.append(b["status"])
+    if b.get("quote") not in (None, ""): sets.append("quote=?"); vals.append(float(b["quote"]))
+    if b.get("notes") is not None: sets.append("notes=?"); vals.append(str(b["notes"]))
+    if "photo" in b: sets.append("photo=?"); vals.append(clean_image(b["photo"]))  # "" removes the photo
+    if not c.execute(f"UPDATE repairs SET {','.join(sets)} WHERE id=?", vals + [rid]).rowcount: raise Err("Repair not found", 404)
     return {"ok": True}
 
 # (method, path regex) -> handler
@@ -304,12 +329,11 @@ ROUTES = [
  ("POST", r"/api/forgot", forgot),
  ("GET", r"/api/customers", lambda c, b: rows(c, "SELECT id,name,phone,dob,id_checked FROM customers ORDER BY name")),
  ("POST", r"/api/customers", add_customer),
- ("GET", r"/api/sales", lambda c, b: rows(c, """SELECT s.id,s.total,s.created_at,cu.name customer,
+ ("GET", r"/api/sales", lambda c, b: rows(c, """SELECT s.id,s.total,s.discount,s.created_at,cu.name customer,
      (SELECT GROUP_CONCAT(p.name||' x'||i.qty, ', ') FROM sale_items i JOIN products p ON p.id=i.product_id WHERE i.sale_id=s.id) items
      FROM sales s JOIN customers cu ON cu.id=s.customer_id ORDER BY s.id DESC LIMIT 50""")),
  ("POST", r"/api/sales", make_sale),
- ("GET", r"/api/repairs", lambda c, b: rows(c, """SELECT r.*,cu.name customer,cu.phone FROM repairs r
-     JOIN customers cu ON cu.id=r.customer_id ORDER BY r.status='collected', r.id DESC""")),
+ ("GET", r"/api/repairs", list_repairs),
  ("POST", r"/api/repairs", add_repair),
  ("PUT", r"/api/repairs/(\d+)", lambda c, b, i: update_repair(c, b, int(i))),
 ]
@@ -348,6 +372,14 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith("/api/"): return self.handle_api("GET")
         path = self.path.split("?")[0]; im = re.fullmatch(r"/img/(\d+)", path); ci = re.fullmatch(r"/catimg/(.+)", path)
+        ri = re.fullmatch(r"/rimg/(\d+)", path)
+        if ri:
+            with db() as c:
+                if not valid_session(c, (parse_qs(urlsplit(self.path).query).get("t") or [""])[0]): return self.send(401, b"", "text/plain")
+                r = c.execute("SELECT photo FROM repairs WHERE id=?", (int(ri.group(1)),)).fetchone()
+            m = re.fullmatch(r"data:(image/[a-z+]+);base64,(.+)", (r[0] if r else "") or "", re.S)
+            if not m: return self.send(404, b"", "text/plain")
+            return self.send(200, base64.b64decode(m.group(2)), m.group(1), "private, max-age=86400")
         if im or ci:
             with db() as c:
                 if im: r = c.execute("SELECT image FROM products WHERE id=?", (int(im.group(1)),)).fetchone(); v = r[0] if r else ""

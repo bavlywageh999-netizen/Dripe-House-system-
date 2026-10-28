@@ -6,7 +6,7 @@ Storefront + shop/repair manager. Python 3.8+, no installs.
 
 Keep `app.py`, `index.html` and `start.bat` in the same folder. `app.py` must be running for sign-in to work;
 if the page is opened another way (Live Server, a double-clicked file) it finds `app.py` on port 8000 by itself.
-Optional settings: MIN_AGE=18  PORT=9000  ADMIN_PASSWORD=yourpass. Data lives in workshop.db.
+Optional settings: MIN_AGE=18  PORT=9000  ADMIN_PASSWORD=yourpass. (MIN_AGE only applies to customers saved earlier with a date of birth.) Data lives in workshop.db.
 
 ## Signing in
 - **First start only:** the password is saved hashed in the database. ADMIN_PASSWORD sets it; if you don't set it, the old default is used and a warning is printed. Change it right away (below).
@@ -30,3 +30,16 @@ Optional settings: MIN_AGE=18  PORT=9000  ADMIN_PASSWORD=yourpass. Data lives in
 - **New badge:** automatic. An item shows the blue "New" circle for 14 days after you add it.
 - **Edit** on a card also has **Delete**. A product that was already sold cannot be deleted (reports need it). Set its stock to 0 instead.
 - If the system still has the old sample products, a **Remove sample products** button appears.
+
+## Repairs
+- Two columns: **Received** and **Completed**. Press **Mark completed** when the device is done, or **Move back** to reopen it.
+- **Photo of the device:** choose a picture when you book the device in, or press **Add photo** / **Photo** on a card later. Click the small picture to see it large, replace it or remove it. Repair photos are only shown to signed-in staff.
+- Repairs that were in the old Diagnosing / Repairing columns are now Received. Ready / Collected are now Completed.
+
+## Customers and sales
+- The date of birth box is gone. Look at the customer's photo ID and tick **I checked photo ID**. A sale cannot be completed for a customer until it is ticked.
+- **Sales list:** the stock column is gone. Use **−** and **+** to change how many of an item are in the sale (it stops at what you have in stock). The same − / + appears on the Shop cards and in the Current sale box.
+- **Discount:** in the Current sale box type a number and choose **L.E.** (an amount) or **%**. The total updates as you type. Reports show the money you actually received, after the discount.
+
+## Hover
+When you point at a card, tile, button or table row it lifts and catches the light. This is switched off automatically for people who have "reduce motion" turned on.
