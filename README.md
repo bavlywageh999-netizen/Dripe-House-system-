@@ -43,3 +43,15 @@ Optional settings: MIN_AGE=18  PORT=9000  ADMIN_PASSWORD=yourpass. (MIN_AGE only
 
 ## Hover
 When you point at a card, tile, button or table row it lifts and catches the light. This is switched off automatically for people who have "reduce motion" turned on.
+
+## Start automatically (no more running it in VS Code)
+Run this once, from the folder that has app.py and index.html:
+
+    Mac:      python3 install_autostart.py
+    Windows:  python install_autostart.py
+
+- Stop the server you started in VS Code first (click its terminal, press Ctrl+C), or the installer will tell you the port is busy.
+- It copies the program and your data to a folder called `DripHouse` in your home folder and starts the server in the background every time you sign in. Then just open http://localhost:8000 (bookmark it).
+- **To update:** replace app.py / index.html in your project folder and run the installer again. It restarts the server and never overwrites your database.
+- **Switch it off:** `python3 install_autostart.py remove` (your data stays).
+- Problems? Open `server.log` in the DripHouse folder; it shows what the server said.
