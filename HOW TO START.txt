@@ -1,0 +1,19 @@
+DRIP HOUSE SHOP SYSTEM - how to start
+
+1. Install Python 3.8 or newer from python.org (Windows: tick "Add Python to PATH").
+2. Unzip this folder somewhere (for example your Documents).
+
+WINDOWS
+  Double-click start.bat. Your browser opens. Keep the black window open while you work.
+  To make it start by itself: open a terminal in this folder and run  python install_autostart.py
+
+MAC
+  Open Terminal in this folder and run  python3 install_autostart.py
+  Then open  http://localhost:8000  and bookmark it.
+
+FIRST START ONLY
+  A RECOVERY KEY is shown once. Write it down and keep it safe.
+  To choose your password before the first start, set ADMIN_PASSWORD (see README.md).
+  Change the password right away if you did not.
+
+More help: README.md
